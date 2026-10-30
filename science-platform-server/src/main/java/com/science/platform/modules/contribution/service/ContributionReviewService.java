@@ -119,8 +119,8 @@ public class ContributionReviewService {
             throw new BusinessException("该建议当前状态为 " + statusText(contribution.getStatus()) + "，不能重复处理");
         }
 
-        // ---- 2. 读取当前正式文章 ----
-        ScienceArticle article = articleMapper.selectById(contribution.getArticleId());
+        // ---- 2. 读取当前正式文章（加行锁，防止同一文章并发审核时基于旧版本重复更新）----
+        ScienceArticle article = articleMapper.selectByIdForUpdate(contribution.getArticleId());
         if (article == null) {
             throw BusinessException.notFound("目标文章已被删除，无法更新");
         }
@@ -149,7 +149,13 @@ public class ContributionReviewService {
         version.setOperatorId(reviewerId);
         version.setSourceContributionId(contribution.getId());
         version.setCreatedAt(now);
-        articleVersionMapper.insert(version);
+        try {
+            articleVersionMapper.insert(version);
+        } catch (org.springframework.dao.DuplicateKeyException ex) {
+            // 行锁之外的第二道保险：uk_article_version 撞键说明同一版本号已被写过。
+            // 转成业务提示，避免把数据库异常直接抛给前端。
+            throw new BusinessException("文章版本已变化，请刷新审核详情后重试");
+        }
 
         // ---- 5. 更新正式文章：正文替换 + 版本号加一 ----
         ScienceArticle articleUpdate = new ScienceArticle();

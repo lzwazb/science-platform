@@ -1,12 +1,13 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { getHealth } from '@/api/health'
+import { getSiteInfo } from '@/api/system'
 
 /**
- * 首页（开发档案附录 A 要求）：
- * 显示项目名称、后端连接状态和简单的功能导航占位。
+ * 首页：展示平台基础信息、后端连通状态与功能模块导航。
  *
- * 后端状态通过真实调用 GET /api/v1/health 获得，不使用静态假数据。
+ * 平台名称、简介、横幅与公告都来自后台「系统设置」，由超级管理员维护；
+ * 后端读取失败时用内置默认值兜底，保证首页永远能打开。
  */
 const loading = ref(true)
 const connected = ref(false)
@@ -14,15 +15,31 @@ const health = ref(null)
 const errorMessage = ref('')
 const checkedAt = ref('')
 
-// 七个核心模块（开发档案 1.3 / 第 14.2 节），此处仅作导航占位，随阶段逐步开放
+const siteInfo = ref(null)
+
+/** 后台未配置或接口异常时的兜底文案 */
+const FALLBACK_SITE = {
+  name: '科普知识共创与创意传播平台',
+  subtitle: 'Knowledge Co-creation & Creative Communication',
+  description:
+    '让科普知识在阅读、共创、创作与传播之间流动起来：用户既阅读经过核对的科普文章，也能提交补充与纠错建议，创作与文章相关的创意作品，并参与主题活动。',
+  banner: '发现不准确？提交纠错，让知识更靠谱',
+  announcements: [],
+}
+
+const site = computed(() => siteInfo.value || FALLBACK_SITE)
+
+/**
+ * 七个核心模块（开发档案 1.3 / 14.2 节），均已实现并接入真实接口。
+ */
 const modules = [
-  { name: '科普知识库与专题探索', detail: '分类、文章详情、关键词搜索、专题浏览', stage: '阶段 4' },
-  { name: '创作者中心与作品管理', detail: '作品发布、编辑、分类与知识文章关联', stage: '阶段 5' },
-  { name: '知识共建与纠错', detail: '提交补充/纠错建议、人工审核、历史版本', stage: '阶段 6' },
-  { name: '社区互动', detail: '评论、点赞、收藏与内容反馈', stage: '阶段 7' },
-  { name: '主题创作活动', detail: '活动发布、作品投稿、人工评审与优秀作品展示', stage: '阶段 8' },
-  { name: '消息通知与个人中心', detail: '个人资料、我的作品/贡献/收藏、站内消息', stage: '阶段 9' },
-  { name: '后台管理与系统管理', detail: '分类、文章、活动、评论反馈与角色权限管理', stage: '后续阶段' },
+  { name: '科普知识库与专题探索', detail: '分类筛选、文章详情、关键词搜索与专题浏览', link: '/knowledge' },
+  { name: '创作者中心与作品管理', detail: '作品发布、编辑与知识文章关联', link: '/works' },
+  { name: '知识共建与纠错', detail: '提交补充 / 纠错建议、人工审核、历史版本追溯', link: '/knowledge' },
+  { name: '社区互动', detail: '评论、点赞、收藏与内容反馈', link: '/works' },
+  { name: '主题创作活动', detail: '活动发布、作品投稿、人工评审与优秀作品展示', link: '/events' },
+  { name: '消息通知与个人中心', detail: '个人资料、我的作品 / 贡献 / 收藏、站内消息', link: '/profile' },
+  { name: '后台管理与系统设置', detail: '分类、文章、作品、活动、反馈与角色权限管理', link: '/admin' },
 ]
 
 async function checkBackend() {
@@ -44,21 +61,47 @@ async function checkBackend() {
   }
 }
 
-onMounted(checkBackend)
+async function fetchSiteInfo() {
+  try {
+    siteInfo.value = await getSiteInfo()
+  } catch {
+    // 静默兜底：首页不应因为配置接口失败而打不开
+    siteInfo.value = null
+  }
+}
+
+onMounted(() => {
+  checkBackend()
+  fetchSiteInfo()
+})
 </script>
 
 <template>
   <div class="home">
     <section class="hero">
-      <p class="hero__eyebrow">本科毕业设计 · 项目骨架已就绪</p>
-      <h1 class="hero__title">科普知识共创与创意传播平台</h1>
-      <p class="hero__subtitle">
-        让科普知识在阅读、共创、创作与传播之间流动起来：用户既阅读经过核对的科普文章，也能提交补充与纠错建议，
-        创作与文章相关的创意作品，并参与主题活动。
-      </p>
+      <p class="hero__eyebrow">本科毕业设计 · {{ site.subtitle }}</p>
+      <h1 class="hero__title">{{ site.name }}</h1>
+      <p class="hero__subtitle">{{ site.description }}</p>
+      <p v-if="site.banner" class="hero__banner">{{ site.banner }}</p>
       <p class="hero__stack">
         Spring Boot 3.5 · Java 21 · Maven · MyBatis-Plus · MySQL 8 · Vue 3 · Vite · Element Plus · Axios
       </p>
+    </section>
+
+    <section v-if="site.announcements?.length" class="announcements">
+      <div class="announcements__head">
+        <h2>系统公告</h2>
+        <span class="announcements__count">{{ site.announcements.length }} 条</span>
+      </div>
+      <ul class="announcements__list">
+        <li v-for="item in site.announcements" :key="item.id" class="announcement">
+          <div class="announcement__head">
+            <strong>{{ item.title }}</strong>
+            <span class="announcement__time">{{ (item.publishedAt || '').slice(0, 10) }}</span>
+          </div>
+          <p class="announcement__content">{{ item.content }}</p>
+        </li>
+      </ul>
     </section>
 
     <section class="status-card">
@@ -111,17 +154,17 @@ onMounted(checkBackend)
     <section class="modules">
       <div class="modules__head">
         <h2>核心功能模块</h2>
-        <p>以下为开发档案确定的七个模块，正在按下表阶段逐个实现，当前尚未开放入口。</p>
+        <p>以下七个模块均已实现并接入真实后端接口，点击卡片进入对应页面。</p>
       </div>
 
       <div class="modules__grid">
-        <article v-for="item in modules" :key="item.name" class="module-card">
+        <RouterLink v-for="item in modules" :key="item.name" :to="item.link" class="module-card">
           <div class="module-card__top">
             <h3>{{ item.name }}</h3>
-            <el-tag size="small" type="info" effect="plain">{{ item.stage }}</el-tag>
+            <el-tag size="small" type="success" effect="plain">已开放</el-tag>
           </div>
           <p class="module-card__detail">{{ item.detail }}</p>
-        </article>
+        </RouterLink>
       </div>
     </section>
   </div>
@@ -167,11 +210,88 @@ onMounted(checkBackend)
   color: var(--sp-text);
 }
 
+.hero__banner {
+  margin: 0 0 16px;
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(64, 158, 255, 0.12);
+  font-size: 13px;
+  color: var(--sp-primary-dark);
+}
+
 .hero__stack {
   margin: 0;
   font-size: 12px;
   color: var(--sp-text-muted);
   letter-spacing: 0.2px;
+}
+
+.announcements {
+  margin-top: 24px;
+  padding: 20px 24px 8px;
+  border: 1px solid var(--sp-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.announcements__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.announcements__head h2 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--sp-text-strong);
+}
+
+.announcements__count {
+  font-size: 12px;
+  color: var(--sp-text-faint);
+}
+
+.announcements__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.announcement {
+  padding: 12px 0;
+  border-top: 1px dashed var(--sp-border);
+}
+
+.announcement:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.announcement__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.announcement__head strong {
+  font-size: 14px;
+  color: var(--sp-text-strong);
+}
+
+.announcement__time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--sp-text-faint);
+}
+
+.announcement__content {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--sp-text-muted);
+  white-space: pre-wrap;
 }
 
 .status-card {
@@ -233,16 +353,19 @@ onMounted(checkBackend)
 }
 
 .module-card {
+  display: block;
   padding: 16px 18px;
   border: 1px solid var(--sp-border);
   border-radius: 12px;
   background: #fff;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  text-decoration: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .module-card:hover {
   border-color: rgba(64, 158, 255, 0.45);
   box-shadow: 0 6px 18px rgba(64, 158, 255, 0.1);
+  transform: translateY(-2px);
 }
 
 .module-card__top {

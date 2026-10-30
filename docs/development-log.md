@@ -1769,3 +1769,137 @@ manualChunks(id) {
 - 文档齐备：从环境记录到答辩脚本，可直接用于论文撰写与现场演示
 
 至此项目达到「可运行、可演示、可测试、可撰写论文」的目标。
+
+---
+
+## 2026-10-30 · 第二轮优化
+
+**范围**：增量优化，不重构、不删除现有功能、不引入 Redis / MQ / 微服务。
+
+### 1. 系统基础设置（新增模块）
+
+| 文件 | 职责 |
+| --- | --- |
+| `system/entity/SysConfig` / `SysAnnouncement` | 两张新表实体 |
+| `system/mapper/SysConfigMapper` / `SysAnnouncementMapper` | Mapper |
+| `system/service/SiteConfigService` | 平台配置读写（键值对 upsert） |
+| `system/service/AnnouncementService` | 公告 CRUD + 状态流转 |
+| `system/SiteController` | 公开：`/site/info`、`/announcements` |
+| `system/AdminSettingsController` | 超管：`/admin/settings`、`/admin/announcements` |
+| `system/dto/SiteSettingsRequest` / `AnnouncementSaveRequest` | 请求体 |
+| `system/vo/SiteInfoVO` / `AnnouncementVO` | 展示对象 |
+
+**设计取舍**：配置用键值对存储而不是每项一个字段，以后加配置项（备案号、运营单位）
+不用改表。代价是要按键查询，但只有几条记录，按唯一索引查极快。
+
+**没做缓存**：加内存缓存就要处理「改完配置首页还显示旧值」的一致性问题，
+而这几个键的查询本身就是走唯一索引的单行查询，不值得。
+
+### 2. 后台作品管理（补齐）
+
+第一轮只有审核工作台，管理员缺少跨状态查看的入口。新增 `AdminWorkController`：
+
+- `GET /admin/works` 全状态列表（status、keyword 筛选）
+- `GET /admin/works/{id}` 任意状态详情
+- `POST /admin/works/{id}/offline` 下架违规作品
+
+下架复用 `WorkReviewService.offline`，**没有另写一套状态流转**；
+同时给它补了作者通知——否则作者只会发现作品"凭空消失"。
+
+### 3. 知识贡献并发校验
+
+**问题**：两条针对同一文章的贡献同时通过时，两个事务读到同一个 `version_no`，
+会写相同版本号的历史快照。
+
+**方案**：`SELECT ... FOR UPDATE` 行锁 + 唯一索引冲突转业务提示。
+
+```java
+// ScienceArticleMapper
+@Select("SELECT * FROM science_article WHERE id = #{id} AND deleted = 0 FOR UPDATE")
+ScienceArticle selectByIdForUpdate(@Param("id") Long id);
+```
+
+```java
+try {
+    articleVersionMapper.insert(version);
+} catch (DuplicateKeyException ex) {
+    throw new BusinessException("文章版本已变化，请刷新审核详情后重试");
+}
+```
+
+行锁让第二个事务等待并读到最新版本号；唯一索引是不依赖锁的兜底，
+并把数据库异常翻译成用户能看懂的话。
+
+### 4. 活动时间状态核验
+
+检查结论：三个入口已共用 `EventService.timeStatusOf`，前端只读返回值。
+补了 `EventStatusConsistencyTest` 把这件事固定下来，避免以后有人图省事在前端自己算。
+
+### 5. 评论回复通知
+
+`CommentService.create` 里补充：回复他人评论时给父评论作者发 `COMMENT_REPLY` 通知，
+自己回复自己不发。内容带回复者昵称与被回复评论的摘要。
+
+### 6. 数据库变化
+
+**只新增，不改现有表**：
+
+| 表 | 说明 |
+| --- | --- |
+| `sys_config` | 平台配置，`uk_config_key` 唯一索引 |
+| `sys_announcement` | 公告，`idx_status_sort` + `idx_published_at` |
+
+统计：表 20 → 22，外键 29 → 31，索引 72 → 79（实测 `information_schema`）。
+`seed.sql` 追加 5 项配置 + 3 条公告（含 1 条草稿，用于验证草稿不外露）。
+
+### 7. 前端
+
+| 文件 | 说明 |
+| --- | --- |
+| `api/system.js` | 平台信息、设置、公告共 10 个方法 |
+| `api/adminWork.js` | 后台作品管理 3 个方法 |
+| `views/admin/AdminSettingsView.vue` | `/admin/settings`，两个 tab：平台信息 / 系统公告 |
+| `views/admin/AdminWorkView.vue` | `/admin/works`，列表 + 详情 + 下架对话框 |
+| `views/public/HomeView.vue` | 首页改为读取 `/site/info`，新增公告栏，模块卡片可点击 |
+
+`AdminLayout` 的灰色占位项全部移除，菜单新增「作品管理」「系统设置」。
+
+### 8. 测试
+
+新增 3 个测试类、17 个用例：
+
+| 测试类 | 用例 | 覆盖 |
+| --- | --- | --- |
+| `SystemSettingsApiTest` | 12 | 权限边界、设置读写、公告全生命周期、校验 |
+| `ContributionConcurrencyTest` | 2 | 并发审核不产生重复版本（不加 `@Transactional`，手动清理） |
+| `EventStatusConsistencyTest` | 3 | 四个入口时间状态一致、静态规则 |
+
+```
+Tests run: 126, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+**过程中修正**：`ContributionConcurrencyTest` 初次编译失败，因为我把 DTO 写成了
+`ContributionApproveRequest`，实际类名是 `ContributionReviewRequest`，方法签名是
+`approve(id, request, reviewerId)`。看代码而不是凭记忆写，才一次改对。
+
+### 9. 一个测试设计上的注意点
+
+`ContributionConcurrencyTest` 刻意**不加** `@Transactional`：
+
+- Spring 的事务上下文基于 ThreadLocal，子线程里调用 Service 会开启独立事务
+- 如果测试方法自带事务，子线程看不到测试线程插入的未提交数据
+- 行锁在「同一事务内」会直接重入，测不出真实的等待行为
+
+所以改为 `@BeforeEach` 记录原状态、`@AfterEach` 手动清理，
+用 `ExecutorService` + `CountDownLatch` 让两个线程真正同时起跑。
+
+### 10. 遗留问题
+
+| 编号 | 问题 | 说明 |
+| --- | --- | --- |
+| 1 | 配置项固定为五项 | 未做通用的任意键值管理界面 |
+| 2 | 公告不支持定时发布 | 需手动点「发布」 |
+| 3 | 作品不支持批量下架 | 一次一件 |
+| 4 | 并发测试是两线程模拟 | 不是压力测试；行锁依赖 InnoDB |
+| 5 | 评论删除时不通知原作者 | 目前只在回复时通知 |

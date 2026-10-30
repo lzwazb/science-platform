@@ -9,6 +9,7 @@ import com.science.platform.modules.interaction.dto.CommentCreateRequest;
 import com.science.platform.modules.interaction.entity.InteractionComment;
 import com.science.platform.modules.interaction.mapper.InteractionCommentMapper;
 import com.science.platform.modules.interaction.vo.CommentVO;
+import com.science.platform.modules.notification.service.NotificationService;
 import com.science.platform.modules.user.entity.SysUser;
 import com.science.platform.modules.user.mapper.SysUserMapper;
 import org.springframework.stereotype.Service;
@@ -35,10 +36,14 @@ public class CommentService {
 
     private final InteractionCommentMapper commentMapper;
     private final SysUserMapper sysUserMapper;
+    private final NotificationService notificationService;
 
-    public CommentService(InteractionCommentMapper commentMapper, SysUserMapper sysUserMapper) {
+    public CommentService(InteractionCommentMapper commentMapper,
+                          SysUserMapper sysUserMapper,
+                          NotificationService notificationService) {
         this.commentMapper = commentMapper;
         this.sysUserMapper = sysUserMapper;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -113,6 +118,26 @@ public class CommentService {
         comment.setContent(request.getContent().trim());
         comment.setStatus(STATUS_VISIBLE);
         commentMapper.insert(comment);
+
+        // 回复他人时通知被回复者；自己回复自己不通知
+        if (parentId != null) {
+            InteractionComment parent = commentMapper.selectById(parentId);
+            if (parent != null && !Objects.equals(parent.getUserId(), userId)) {
+                SysUser replier = sysUserMapper.selectById(userId);
+                String replierName = replier == null ? "有人" : replier.getNickname();
+                String preview = comment.getContent();
+                if (preview.length() > 40) {
+                    preview = preview.substring(0, 40) + "…";
+                }
+                notificationService.send(
+                        parent.getUserId(),
+                        "COMMENT_REPLY",
+                        "你的评论收到回复",
+                        replierName + " 回复了你的评论：" + preview,
+                        request.getTargetType(),
+                        request.getTargetId());
+            }
+        }
 
         return toVOs(List.of(comment), userId).get(0);
     }

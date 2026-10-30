@@ -30,6 +30,8 @@ public class SecurityConfig {
             "/api/v1/health",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
+            "/api/v1/site/info",
+            "/api/v1/announcements",
             "/error"
     };
 
@@ -71,6 +73,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         // 账号与角色管理只对超级管理员开放
                         .requestMatchers("/api/v1/admin/users/**").hasRole("SUPER_ADMIN")
+                        // 系统基础设置与公告只对超级管理员开放（开发档案 V1.1 要求）
+                        .requestMatchers("/api/v1/admin/settings", "/api/v1/admin/settings/**")
+                        .hasRole("SUPER_ADMIN")
+                        .requestMatchers("/api/v1/admin/announcements", "/api/v1/admin/announcements/**")
+                        .hasRole("SUPER_ADMIN")
                         // 其余后台接口需要管理员及以上
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // 创作者中心：创作者、管理员、超级管理员

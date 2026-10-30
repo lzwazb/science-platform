@@ -765,6 +765,93 @@ GET /api/v1/users/me/overview
 角色与状态变更都会写 `sys_operation_log`（`USER_ROLE_UPDATE` / `USER_ENABLE` / `USER_DISABLE`），
 `reason` 一并入库便于追溯。
 
+### 2.26 平台公开信息（第二轮优化新增）
+
+| 方法 | 路径 | 认证 | 用途 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/site/info` | 公开 | 首页平台信息：名称、副标题、简介、横幅、联系邮箱 + 最近 5 条已发布公告 |
+| GET | `/api/v1/announcements` | 公开 | 已发布公告列表，`limit` 可选 |
+
+首页只需要调 `/site/info` 一次就能拿到全部展示数据，不用再单独请求公告。
+
+配置项以键值对存储在 `sys_config`，目前使用的键：
+
+| 键 | 说明 |
+| --- | --- |
+| `site.name` | 平台名称 |
+| `site.subtitle` | 副标题（英文） |
+| `site.description` | 平台简介 |
+| `site.banner` | 首页横幅文案 |
+| `site.contact` | 联系邮箱 |
+
+读取时如果某个键不存在，会用内置默认值兜底，不会因为配置缺失导致首页白屏。
+
+### 2.27 系统基础设置（仅超级管理员）
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/admin/settings` | 读取平台基础信息 |
+| PUT | `/api/v1/admin/settings` | 保存，body 含 `name`、`subtitle`、`description`、`banner`、`contact` |
+| GET | `/api/v1/admin/announcements` | 公告列表，含草稿与已下架，`status` 可选筛选 |
+| POST | `/api/v1/admin/announcements` | 新增公告（默认存为草稿） |
+| PUT | `/api/v1/admin/announcements/{id}` | 编辑公告 |
+| POST | `/api/v1/admin/announcements/{id}/publish` | 发布 |
+| POST | `/api/v1/admin/announcements/{id}/offline` | 下架 |
+| DELETE | `/api/v1/admin/announcements/{id}` | 删除（逻辑删除） |
+
+**权限**：这两组接口在 `SecurityConfig` 里限定 `SUPER_ADMIN`，
+`AdminSettingsController` 上另有 `@PreAuthorize("hasRole('SUPER_ADMIN')")` 做双重保险。
+普通管理员访问返回 **403**（实测），未登录返回 **401**。
+
+**公告状态流转**：
+
+```
+DRAFT ──发布──> PUBLISHED ──下架──> OFFLINE
+                   ↑                    │
+                   └──────重新发布───────┘
+```
+
+| 场景 | 结果 |
+| --- | --- |
+| 新建公告不传 status | 存为 `DRAFT` |
+| 重复发布 | `400 公告已是发布状态` |
+| 重复下架 | `400 公告已是下架状态` |
+| 草稿 / 已下架 | 前台公开接口不可见 |
+| 首次发布 | 记录 `published_at`，重新发布时保留首次时间 |
+| 标题或正文为空 | `400` 并指出具体字段 |
+
+所有写操作都记入 `sys_operation_log`：
+`SITE_SETTINGS_UPDATE`、`ANNOUNCEMENT_CREATE/UPDATE/PUBLISH/OFFLINE/DELETE`。
+
+### 2.28 后台作品管理（第二轮优化新增）
+
+| 方法 | 路径 | 认证 | 用途 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/admin/works` | ADMIN 及以上 | 全部作品分页，支持 `status`、`keyword` |
+| GET | `/api/v1/admin/works/{id}` | ADMIN 及以上 | 任意状态的作品详情 |
+| POST | `/api/v1/admin/works/{id}/offline` | ADMIN 及以上 | 下架违规作品，body `{"comment": "原因"}` |
+
+**与审核工作台的分工**（避免重复开发）：
+
+| 场景 | 接口 | 说明 |
+| --- | --- | --- |
+| 待审核作品 → 通过 / 驳回 | `/api/v1/review/works/**` | 评审员及以上，只处理 `PENDING` |
+| 跨状态查看全部作品 | `/api/v1/admin/works` | 管理员及以上，日常管理视角 |
+| 下架已发布作品 | `/api/v1/admin/works/{id}/offline` | 处理违规内容 |
+
+下架复用 `WorkReviewService.offline`，与审核工作台共用同一套状态流转逻辑，没有另写一份。
+
+**下架后的效果**（实测）：
+
+| 项 | 结果 |
+| --- | --- |
+| 作品状态 | `PUBLISHED` → `OFFLINE` |
+| 前台详情 | `404`（不再对游客可见） |
+| 作者通知 | 新增一条 `REVIEW_RESULT`，含下架原因 |
+| 审核工作台 | 不受影响，仍只显示 `PENDING` 作品 |
+
+> 作品不提供删除操作：已发布作品统一用「下架」，作者的历史记录与互动数据完整保留。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。

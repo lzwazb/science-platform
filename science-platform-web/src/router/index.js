@@ -177,6 +177,18 @@ const routes = [
             component: () => import('@/views/admin/AdminUserView.vue'),
             meta: { title: '用户与角色', roles: ['SUPER_ADMIN'] },
           },
+          {
+            path: 'works',
+            name: 'admin-works',
+            component: () => import('@/views/admin/AdminWorkView.vue'),
+            meta: { title: '作品管理' },
+          },
+          {
+            path: 'settings',
+            name: 'admin-settings',
+            component: () => import('@/views/admin/AdminSettingsView.vue'),
+            meta: { title: '系统设置', roles: ['SUPER_ADMIN'] },
+          },
         ],
       },
     ],

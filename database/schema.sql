@@ -24,6 +24,8 @@ SET NAMES utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `sys_announcement`;
+DROP TABLE IF EXISTS `sys_config`;
 DROP TABLE IF EXISTS `sys_operation_log`;
 DROP TABLE IF EXISTS `sys_notification`;
 DROP TABLE IF EXISTS `event_review`;
@@ -426,3 +428,39 @@ CREATE TABLE `sys_operation_log` (
     KEY `idx_created_at` (`created_at`),
     CONSTRAINT `fk_log_operator` FOREIGN KEY (`operator_id`) REFERENCES `sys_user` (`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '重要操作日志';
+
+-- =============================================================================
+-- 八、系统基础设置（第二轮优化新增）
+-- =============================================================================
+
+-- 平台基础配置：键值对存储，便于以后扩展配置项而不用改表结构
+CREATE TABLE `sys_config` (
+    `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `config_key`   VARCHAR(64)     NOT NULL COMMENT '配置键，如 site.name',
+    `config_value` TEXT                     DEFAULT NULL COMMENT '配置值',
+    `description`  VARCHAR(255)             DEFAULT NULL COMMENT '配置说明',
+    `updated_by`   BIGINT UNSIGNED          DEFAULT NULL COMMENT '最后修改人',
+    `created_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_config_key` (`config_key`),
+    CONSTRAINT `fk_config_operator` FOREIGN KEY (`updated_by`) REFERENCES `sys_user` (`id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '平台基础配置';
+
+-- 系统公告：由超级管理员维护，仅 PUBLISHED 状态对前台可见
+CREATE TABLE `sys_announcement` (
+    `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `title`        VARCHAR(150)    NOT NULL COMMENT '公告标题',
+    `content`      TEXT            NOT NULL COMMENT '公告正文',
+    `status`       VARCHAR(20)     NOT NULL DEFAULT 'DRAFT' COMMENT '状态：DRAFT/PUBLISHED/OFFLINE',
+    `sort_order`   INT             NOT NULL DEFAULT 0 COMMENT '排序，数值越大越靠前',
+    `publisher_id` BIGINT UNSIGNED NOT NULL COMMENT '创建人',
+    `published_at` DATETIME                 DEFAULT NULL COMMENT '发布时间',
+    `created_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`      TINYINT         NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常，1 已删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_status_sort` (`status`, `sort_order`),
+    KEY `idx_published_at` (`published_at`),
+    CONSTRAINT `fk_announcement_publisher` FOREIGN KEY (`publisher_id`) REFERENCES `sys_user` (`id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '系统公告';

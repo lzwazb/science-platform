@@ -3,6 +3,7 @@ package com.science.platform.modules.work.service;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.science.platform.common.exception.BusinessException;
+import com.science.platform.modules.notification.service.NotificationService;
 import com.science.platform.modules.work.entity.CreatorWork;
 import com.science.platform.modules.work.mapper.CreatorWorkMapper;
 import com.science.platform.modules.work.vo.WorkDetailVO;
@@ -24,10 +25,14 @@ public class WorkReviewService {
 
     private final CreatorWorkMapper workMapper;
     private final WorkQueryService workQueryService;
+    private final NotificationService notificationService;
 
-    public WorkReviewService(CreatorWorkMapper workMapper, WorkQueryService workQueryService) {
+    public WorkReviewService(CreatorWorkMapper workMapper,
+                             WorkQueryService workQueryService,
+                             NotificationService notificationService) {
         this.workMapper = workMapper;
         this.workQueryService = workQueryService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -67,6 +72,9 @@ public class WorkReviewService {
 
     /**
      * 下架已发布作品（处理违规内容时使用）。
+     *
+     * <p>下架后前台立即不可见，并给作者发一条站内通知说明原因——
+     * 否则作者只会发现作品"凭空消失"。</p>
      */
     @Transactional
     public WorkDetailVO offline(Long id, String comment, Long operatorId) {
@@ -78,6 +86,16 @@ public class WorkReviewService {
             throw new BusinessException("只有已发布的作品可以下架");
         }
         applyReviewResult(id, WorkService.STATUS_OFFLINE, operatorId, comment);
+
+        notificationService.send(
+                work.getCreatorId(),
+                "REVIEW_RESULT",
+                "作品已被下架",
+                "你的作品《" + work.getTitle() + "》已被下架，前台不再展示。"
+                        + (StringUtils.hasText(comment) ? "原因：" + comment.trim() : "如需了解原因请联系管理员。"),
+                "WORK",
+                id);
+
         return workQueryService.getDetailAnyStatus(id);
     }
 

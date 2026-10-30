@@ -15,7 +15,7 @@
 | 引用完整 | 强关联（谁属于谁）用外键约束；多态关联（评论/点赞/收藏指向文章或作品）不加外键，由 Service 校验 |
 | 幂等约束 | 点赞、收藏、投稿、评审、专题文章、作品文章关系均设唯一索引，从数据库层杜绝重复数据 |
 
-## 2. 表分组（共 20 张）
+## 2. 表分组（共 22 张）
 
 | 分组 | 表 | 说明 |
 | --- | --- | --- |
@@ -26,6 +26,10 @@
 | 社区互动（4） | `interaction_comment`、`interaction_like`、`interaction_favorite`、`content_feedback` | 评论、点赞、收藏、内容反馈 |
 | 主题活动（3） | `creative_event`、`event_submission`、`event_review` | 活动、投稿、评审 |
 | 消息与日志（2） | `sys_notification`、`sys_operation_log` | 站内通知、重要操作日志 |
+| 系统设置（2） | `sys_config`、`sys_announcement` | 平台基础配置（键值对）、系统公告 |
+
+> 最后两张表是第二轮优化新增的，用于支持「系统基础设置」模块。
+> 它们不引用任何业务表，因此不影响既有数据与接口契约。
 
 ## 3. 实体关系图
 
@@ -108,15 +112,17 @@ erDiagram
 
 | 项目 | 数量 |
 | --- | --- |
-| 表 | 20 |
-| 外键约束 | 29 |
-| 索引（含主键与唯一索引） | 72 |
+| 表 | 22 |
+| 外键约束 | 31 |
+| 索引（含主键与唯一索引） | 79 |
 
 索引设计要点：
 
 - 列表页高频筛选走组合索引：`science_article(status, published_at)`、`knowledge_contribution(status, created_at)`、`creative_event(status, start_at, end_at)`
 - 多态关联查询走 `(target_type, target_id)`，评论额外带 `status`
 - 通知的未读计数走 `(recipient_id, is_read, created_at)`
+- 公告栏走 `(status, sort_order)`，配合 `published_at` 保证排序稳定
+- 平台配置走唯一索引 `uk_config_key`，按键取值不扫表
 - 标题类模糊搜索（`LIKE '%关键词%'`）无法命中 B+Tree 前缀索引，按档案要求不引入全文检索引擎，数据量在演示规模下可接受，这一点在论文「不足与展望」中说明
 
 ## 7. 相关文件
@@ -124,5 +130,5 @@ erDiagram
 | 文件 | 内容 |
 | --- | --- |
 | `database/schema.sql` | 建库建表、索引、外键、字段注释 |
-| `database/seed.sql` | 演示数据（6 个账号、8 篇文章、4 件作品、3 条贡献、2 个活动等） |
+| `database/seed.sql` | 演示数据（6 个账号、8 篇文章、4 件作品、3 条贡献、2 个活动、5 项平台配置、3 条公告等） |
 | [数据字典](数据字典.md) | 逐表逐字段说明 |
