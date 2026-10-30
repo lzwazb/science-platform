@@ -73,6 +73,12 @@ const routes = [
         meta: { title: '我的贡献', requiresAuth: true },
       },
       {
+        path: 'favorites',
+        name: 'my-favorites',
+        component: () => import('@/views/interaction/MyFavoritesView.vue'),
+        meta: { title: '我的收藏', requiresAuth: true },
+      },
+      {
         path: 'review/contributions',
         name: 'review-contributions',
         component: () => import('@/views/contribution/ReviewContributionsView.vue'),
@@ -128,6 +134,12 @@ const routes = [
             name: 'admin-topics',
             component: () => import('@/views/admin/AdminTopicView.vue'),
             meta: { title: '专题管理' },
+          },
+          {
+            path: 'feedback',
+            name: 'admin-feedback',
+            component: () => import('@/views/admin/AdminFeedbackView.vue'),
+            meta: { title: '内容反馈' },
           },
         ],
       },

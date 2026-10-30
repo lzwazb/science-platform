@@ -524,23 +524,101 @@ GET /api/v1/articles/{id}/versions/{versionNo}
 `article_version` 里存的是**已被覆盖的旧内容**，所以最多到 `N-1`。
 详见 [数据库设计](数据库设计/README.md#51-为什么-article_versionversion_no-表示变更前的内容)。
 
+### 2.17 点赞与收藏
+
+| 方法 | 路径 | 认证 | 用途 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/interactions/likes` | 需登录 | 点赞 |
+| DELETE | `/api/v1/interactions/likes` | 需登录 | 取消点赞 |
+| POST | `/api/v1/interactions/favorites` | 需登录 | 收藏 |
+| DELETE | `/api/v1/interactions/favorites` | 需登录 | 取消收藏 |
+| GET | `/api/v1/interactions/status` | **公开** | 查互动状态与计数 |
+| GET | `/api/v1/interactions/favorites/mine` | 需登录 | 我的收藏 |
+
+写操作的 body（DELETE 也带 body）：`{"targetType": "ARTICLE|WORK", "targetId": 1}`。
+
+**幂等设计**：
+
+- 重复点赞返回 `200` 且 `likeCount` 不变，**不会报错也不会产生第二条记录**
+- 取消未点赞的内容同样 `200`
+- 防重复靠数据库唯一索引 `uk_like(user_id, target_type, target_id)`，捕获 `DuplicateKeyException` 后当作「已点赞」返回，而不是先查后插（并发下先查后插会漏判）
+
+**目标校验**：`targetType + targetId` 必须指向**已发布**的文章或作品，否则 `404`。
+实测给不存在的 ID 与给草稿文章点赞都返回 `404 文章不存在或未发布`。
+
+**状态查询**（游客可访问）：
+
+```json
+{
+  "targetType": "ARTICLE",
+  "targetId": 1,
+  "liked": false,
+  "favorited": false,
+  "likeCount": 3,
+  "favoriteCount": 1,
+  "commentCount": 2
+}
+```
+
+游客能看计数，但 `liked` / `favorited` 恒为 `false`（没有身份可比对）。
+
+**我的收藏**：文章与作品混排，按收藏时间倒序，每项带 `available` 标记——
+目标已下架/删除时为 `false`，前端显示「内容已下架」且不可点击。
+
+### 2.18 评论
+
+| 方法 | 路径 | 认证 | 用途 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/comments?targetType=&targetId=&page=&size=` | **公开** | 按目标查评论 |
+| POST | `/api/v1/comments` | 需登录 | 发表评论或回复 |
+| DELETE | `/api/v1/comments/{id}` | 需登录 | 删除（本人或管理员） |
+
+请求体：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `targetType` | string | `ARTICLE` / `WORK` |
+| `targetId` | long | 目标 ID |
+| `content` | string | 非空，≤ 1000 字 |
+| `parentId` | long | 可选，回复某条评论 |
+
+**只做一层回复**：对「回复」再次回复时，后端把它挂到同一个根评论下（`parentId` 归一化到根），
+避免无限嵌套带来的排序与渲染复杂度。实测：三级回复的 `parentId` 返回的是一级评论 ID。
+
+**删除权限**：本人可删，管理员可删任意评论，其他人 `403 只能删除自己的评论`。
+删除是状态位 `DELETED` 而非物理删除，保留楼层结构。
+
+响应中每条评论带 `mine` 字段，前端据此决定是否显示删除按钮。
+
+### 2.19 内容反馈
+
+| 方法 | 路径 | 认证 | 用途 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/feedback` | 需登录 | 提交反馈 |
+| GET | `/api/v1/feedback/mine` | 需登录 | 我的反馈 |
+| GET | `/api/v1/admin/feedback` | ADMIN 及以上 | 后台反馈列表 |
+| POST | `/api/v1/admin/feedback/{id}/handle` | ADMIN 及以上 | 处理反馈 |
+
+**发布反馈**：`targetType` 支持 `ARTICLE` / `WORK` / `COMMENT`；
+`feedbackType` 取 `WRONG_CONTENT` / `COPYRIGHT` / `SPAM` / `SUGGESTION` / `OTHER`；`description` 必填。
+
+针对 `COMMENT` 的反馈，后台列表的 `targetTitle` 会显示「评论：<内容前 30 字>」，方便定位。
+
+**处理**：body `{"status": "RESOLVED|PROCESSING|REJECTED", "handleComment": "..."}`。
+已处理完（`RESOLVED` / `REJECTED`）的反馈不能再次处理 → `400 该反馈已处理完毕，不能再次处理`。
+处理动作写入 `sys_operation_log`（`action = FEEDBACK_HANDLE`）。
+
+普通用户访问后台反馈接口返回 `403`（实测）。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
 （阶段 3 已实现认证与个人资料 5 个接口，阶段 4 实现知识库与后台内容维护 20 个接口，
 阶段 5 实现作品公开 / 创作者 / 审核 13 个接口，阶段 6 实现知识贡献 / 审核 / 版本 8 个接口，
-见 2.2–2.16。）
+阶段 7 实现互动 / 评论 / 反馈 15 个接口，见 2.2–2.19。）
 
 | 模块 | 方法 | 路径 | 用途 | 计划阶段 |
 | --- | --- | --- | --- | --- |
-| 互动 | POST | `/interactions/likes` | 点赞 | 7 |
-| 互动 | DELETE | `/interactions/likes` | 取消点赞 | 7 |
-| 互动 | POST | `/interactions/favorites` | 收藏 | 7 |
-| 互动 | DELETE | `/interactions/favorites` | 取消收藏 | 7 |
-| 评论 | GET | `/comments` | 按目标查询评论 | 7 |
-| 评论 | POST | `/comments` | 发表评论 | 7 |
-| 评论 | DELETE | `/comments/{id}` | 删除本人评论或由管理员处理 | 7 |
-| 反馈 | POST | `/feedback` | 提交内容反馈 | 7 |
 | 活动 | GET | `/events` | 活动列表 | 8 |
 | 活动 | GET | `/events/{id}` | 活动详情 | 8 |
 | 活动管理 | POST | `/admin/events` | 管理员创建活动 | 8 |

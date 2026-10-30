@@ -16,6 +16,7 @@ const menuItems = computed(() => {
     { path: '/admin/articles', label: '文章管理', role: ['ADMIN', 'SUPER_ADMIN'] },
     { path: '/admin/categories', label: '分类管理', role: ['ADMIN', 'SUPER_ADMIN'] },
     { path: '/admin/topics', label: '专题管理', role: ['ADMIN', 'SUPER_ADMIN'] },
+    { path: '/admin/feedback', label: '内容反馈', role: ['ADMIN', 'SUPER_ADMIN'] },
   ]
   return items.filter((item) => userStore.hasAnyRole(item.role))
 })
@@ -42,7 +43,7 @@ const activePath = computed(() => route.path)
           {{ item.label }}
         </RouterLink>
         <span
-          v-for="(label, index) in ['作品管理', '活动管理', '反馈处理', '用户与角色']"
+          v-for="(label, index) in ['作品管理', '活动管理', '用户与角色']"
           :key="`pending-${index}`"
           class="admin-side__item admin-side__item--disabled"
           title="后续阶段开放"

@@ -40,7 +40,9 @@ public class SecurityConfig {
             "/api/v1/topics/**",
             "/api/v1/works/**",
             "/api/v1/events/**",
-            "/api/v1/comments/**"
+            "/api/v1/comments/**",
+            // 详情页需要展示点赞/收藏计数，游客可读；liked/favorited 对游客恒为 false
+            "/api/v1/interactions/status"
     };
 
     @Bean

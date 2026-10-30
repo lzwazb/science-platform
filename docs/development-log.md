@@ -1089,3 +1089,200 @@ BUILD SUCCESS
 2. 内容反馈提交与后台处理
 3. 前端：文章/作品详情页的互动区、后台反馈处理页
 4. 补测试：T10 重复点赞只留一条、数据按用户隔离、目标不存在时的校验
+
+---
+
+## 2026-10-30 · 阶段 7：社区互动与内容反馈
+
+**目标**（开发档案第 11 章）：评论、点赞、收藏、反馈及后台处理，达成「重复点赞/收藏受约束；数据按用户隔离」。
+
+### 1. 后端实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `interaction/entity/InteractionComment` / `InteractionLike` / `InteractionFavorite` / `ContentFeedback` | 四张互动表实体 |
+| `interaction/service/InteractionTargetResolver` | 多态目标解析：校验存在性与公开可见性、取标题/摘要/封面 |
+| `interaction/service/InteractionService` | 点赞、收藏、取消、状态汇总、我的收藏 |
+| `interaction/service/CommentService` | 评论分页、发表、回复、删除权限 |
+| `interaction/service/FeedbackService` | 反馈提交、后台列表、处理、我的反馈 |
+| `interaction/InteractionController` | `/interactions/**` |
+| `interaction/CommentController` | `/comments` |
+| `interaction/FeedbackController` + `AdminFeedbackController` | 用户侧与后台反馈 |
+
+### 2. 三个设计要点
+
+**（1）防重复靠唯一索引，不靠「先查后插」**
+
+`interaction_like` 与 `interaction_favorite` 都有 `UNIQUE(user_id, target_type, target_id)`。
+点赞逻辑是：先查一次（为了幂等快速返回），插入时如果撞到唯一键就 `catch (DuplicateKeyException)` 当作已点赞。
+并发双击时两次都查到「没点过」也不会产生两条记录——数据库兜底。
+
+**实测**：同一用户连续点赞 3 次，接口三次都返回 `200`，
+`likeCount` 始终为 1，数据库里该用户对该目标只有 1 条记录。
+
+**（2）多态目标必须统一校验**
+
+评论、点赞、收藏、反馈都用 `targetType + targetId` 指向文章或作品，数据库层没有外键。
+如果不在 Service 校验，就会出现「给已下架文章点赞」「给已删除作品评论」这类悬空数据。
+`InteractionTargetResolver` 统一做这件事，并要求目标必须是 `PUBLISHED` 状态。
+实测给不存在的 ID 和给草稿文章点赞都返回 `404`。
+
+**（3）评论只做一层回复**
+
+对「回复」再次回复时，后端把 `parentId` 归一化到根评论，不做无限嵌套。
+这样列表查询只需要「查一级评论 + 一次 `IN` 查所有回复」两次 SQL，
+前端渲染也简单（不必担心缩进层级）。实测三级回复返回的 `parentId` 是一级评论的 ID。
+
+### 3. 验证（真实运行）
+
+#### 3.1 点赞（T10）
+
+| 场景 | 实测 |
+| --- | --- |
+| 游客查状态 | `likeCount=3`、`liked=false`、`favorited=false` |
+| 同一用户连点 3 次 | 三次均 `200`，`likeCount` 始终 1，数据库仅 1 条记录 |
+| 另一用户点赞 | `likeCount` 变 2 |
+| 取消点赞 | `likeCount` 变 1 |
+| 重复取消 | `200`，`likeCount` 仍 1（幂等） |
+| 未登录点赞 | `401` |
+| 给不存在 / 草稿目标点赞 | `404 文章不存在或未发布` |
+
+#### 3.2 收藏
+
+| 场景 | 实测 |
+| --- | --- |
+| 重复收藏 | `favoriteCount` 保持 1，无重复记录 |
+| 我的收藏 | 文章与作品混排，`available=true`，带标题与摘要 |
+
+#### 3.3 评论
+
+| 场景 | 实测 |
+| --- | --- |
+| 游客查看 | 一级评论 + 内嵌回复正确呈现 |
+| 发表评论 | `mine=true` |
+| 回复 | `parentId` = 一级评论 ID |
+| 回复的回复 | `parentId` 归一到一级评论 ID |
+| 未登录发表 | `401` |
+| 他人删除 | `403 只能删除自己的评论` |
+| 本人删除 | `200` |
+| 管理员删除他人评论 | `200` |
+| 删除后列表 | 不再出现该评论 |
+
+#### 3.4 内容反馈
+
+| 场景 | 实测 |
+| --- | --- |
+| 提交 | `PENDING`，返回目标标题 |
+| 我的反馈 | 只含本人记录 |
+| 普通用户访问后台 | `403` |
+| 管理员列表 | 3 条，含提交人与目标标题；针对评论的反馈显示「评论：…」 |
+| 处理 | `RESOLVED`，返回 `handlerName`，写入 `FEEDBACK_HANDLE` 操作日志 |
+| 重复处理 | `400 该反馈已处理完毕，不能再次处理` |
+
+> 第一轮验证时发现两个小问题并已修正：
+> ① 针对 `COMMENT` 的反馈在后台显示「目标：未知内容」——`titleOf` 起初只处理文章与作品，
+> 补上评论分支后显示「评论：<内容前 30 字>」。
+> ② 处理反馈接口返回的 VO 缺 `handlerName`——`handle()` 里用的是不补齐用户名的 `toVO`，
+> 改成走 `toVOs` 后就带上了。
+
+#### 3.5 自动化测试
+
+```
+Tests run: 10  AuthAndSecurityTest
+Tests run: 13  ContributionApiTest
+Tests run: 2   ContributionTransactionTest
+Tests run: 13  InteractionApiTest
+Tests run: 5   ArticlePaginationTest
+Tests run: 13  KnowledgeApiTest
+Tests run: 18  WorkApiTest
+Tests run: 74, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+`InteractionApiTest` 覆盖 13 项：T10 重复点赞、跨用户计数、取消幂等、目标不可见拒绝、
+游客状态查询、未登录拒绝、收藏幂等与我的收藏、评论分页含回复、发表与嵌套回复归层、
+未登录评论拒绝、删除三种权限、反馈提交与处理与重复处理、反馈校验、我的反馈隔离。
+
+**测试稳定性教训**：最初对 `likeCount` 写的是绝对值断言（期望 1），但手工验证时
+在演示数据里留下了点赞记录，导致测试失败。改为「先记录初始计数、断言增量」后稳定。
+这类断言应该只依赖测试自己造成的状态变化。
+
+#### 3.6 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0 |
+| 7 个新增/改动模块编译 | ✅ 全部 200 |
+| 走代理取互动状态 | ✅ `likeCount=3`、`commentCount=2` |
+| SSR 渲染互动条 | ✅ len=1933，含点赞/收藏按钮 |
+| SSR 渲染评论区 | ✅ len=5249，含发表入口 |
+| SSR 渲染我的收藏 | ✅ len=4997 |
+| SSR 渲染后台内容反馈 | ✅ len=6312，含表格 |
+
+### 4. 本阶段产出文件
+
+```
+后端新增：
+  interaction/entity/InteractionComment.java
+  interaction/entity/InteractionLike.java
+  interaction/entity/InteractionFavorite.java
+  interaction/entity/ContentFeedback.java
+  interaction/mapper/InteractionCommentMapper.java
+  interaction/mapper/InteractionLikeMapper.java
+  interaction/mapper/InteractionFavoriteMapper.java
+  interaction/mapper/ContentFeedbackMapper.java
+  interaction/dto/CommentCreateRequest.java
+  interaction/dto/InteractionRequest.java
+  interaction/dto/FeedbackCreateRequest.java
+  interaction/dto/FeedbackHandleRequest.java
+  interaction/vo/CommentVO.java
+  interaction/vo/InteractionStatusVO.java
+  interaction/vo/FavoriteItemVO.java
+  interaction/vo/FeedbackVO.java
+  interaction/service/InteractionTargetResolver.java
+  interaction/service/InteractionService.java
+  interaction/service/CommentService.java
+  interaction/service/FeedbackService.java
+  interaction/InteractionController.java
+  interaction/CommentController.java
+  interaction/FeedbackController.java
+  interaction/AdminFeedbackController.java
+  src/test/java/.../InteractionApiTest.java（13 用例）
+
+后端修改：
+  security/SecurityConfig.java（放行 GET /interactions/status）
+  security/SecurityUtils.java（新增 currentUserOrNull / currentUserIdOrNull / hasAnyRole）
+
+前端新增：
+  src/api/interaction.js
+  src/components/InteractionBar.vue
+  src/components/CommentSection.vue
+  src/views/interaction/MyFavoritesView.vue
+  src/views/admin/AdminFeedbackView.vue
+
+前端修改：
+  src/views/knowledge/ArticleDetailView.vue（接入互动条与评论区，移除占位按钮）
+  src/views/work/WorkDetailView.vue（同上）
+  src/router/index.js（我的收藏、后台反馈两条路由）
+  src/layouts/DefaultLayout.vue（导航加「我的收藏」）
+  src/layouts/AdminLayout.vue（后台菜单加「内容反馈」）
+```
+
+### 5. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 评论没有举报入口 | 只能对文章/作品/评论提交反馈 | 可在评论项加「举报」按钮 |
+| 2 | 评论回复固定一层 | 深层次讨论体验略简 | 档案未要求多层，保持现状 |
+| 3 | 被隐藏（HIDDEN）的评论没有管理入口 | 演示数据里有 1 条 HIDDEN 评论但后台看不到 | 阶段 9 后台可补 |
+| 4 | 收藏不支持分组或排序切换 | 演示够用 | 视需要补 |
+
+### 6. 下一步建议
+
+进入**阶段 8：主题活动**：
+
+1. 活动实体、创作与编辑、状态判定（未开始 / 进行中 / 已结束）
+2. 投稿（活动进行中才可投、同一作品同一活动只能投一次）、评审打分与评语
+3. 优秀作品确认与展示
+4. 前端 `/events`、`/events/:id`、`/review/events`、后台活动管理
+5. 补测试：T11 活动时间校验、重复投稿拒绝、未评审作品不得标为优秀

@@ -5,6 +5,8 @@ import { ElMessage } from 'element-plus'
 import { getArticleDetail } from '@/api/article'
 import { listArticleVersions, submitContribution } from '@/api/contribution'
 import { useUserStore } from '@/stores/user'
+import InteractionBar from '@/components/InteractionBar.vue'
+import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -191,21 +193,17 @@ onMounted(fetchDetail)
           <div class="article-actions">
             <el-button type="primary" @click="openContribute">提交纠错 / 补充</el-button>
             <el-button @click="openVersions">版本历史</el-button>
-            <el-tooltip content="社区互动在阶段 7 开放" placement="top">
-              <span>
-                <el-button disabled>点赞 / 收藏</el-button>
-              </span>
-            </el-tooltip>
-            <span v-if="!userStore.isLoggedIn" class="article-actions__hint">
-              登录后可提交纠错建议
-            </span>
           </div>
+
+          <InteractionBar target-type="ARTICLE" :target-id="article.id" class="article-interaction" />
 
           <p class="article-foot__note">
             发现表述不准确或缺少来源？点击「提交纠错 / 补充」，填写理由与参考来源后进入审核流程。
             建议被采纳时，正式文章会更新，本页的版本历史会记录这次修改。
           </p>
         </footer>
+
+        <CommentSection target-type="ARTICLE" :target-id="article.id" />
       </article>
 
       <!-- 提交纠错对话框 -->
@@ -452,6 +450,10 @@ onMounted(fetchDetail)
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+.article-interaction {
+  margin-top: 16px;
 }
 
 .article-actions__hint {

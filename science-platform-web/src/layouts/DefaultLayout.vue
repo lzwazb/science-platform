@@ -66,6 +66,13 @@ async function handleLogout() {
             我的贡献
           </RouterLink>
           <RouterLink
+            v-if="userStore.isLoggedIn"
+            to="/favorites"
+            class="app-nav__item"
+          >
+            我的收藏
+          </RouterLink>
+          <RouterLink
             v-if="canCreate"
             to="/creator/works"
             class="app-nav__item"
@@ -129,7 +136,7 @@ async function handleLogout() {
 
     <footer class="app-footer">
       <p>本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现</p>
-      <p class="app-footer__meta">阶段 6：知识共建与审核</p>
+      <p class="app-footer__meta">阶段 7：社区互动与内容反馈</p>
     </footer>
   </div>
 </template>

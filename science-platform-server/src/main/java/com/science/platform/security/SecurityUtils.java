@@ -34,4 +34,42 @@ public final class SecurityUtils {
     public static Long currentUserId() {
         return currentUser().getId();
     }
+
+    /**
+     * 获取当前登录用户，未登录时返回 {@code null}。
+     *
+     * <p>用于「登录与游客行为不同、但游客也能访问」的接口，
+     * 例如详情页的点赞状态查询：游客能看计数，但 liked 恒为 false。</p>
+     */
+    public static LoginUser currentUserOrNull() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof LoginUser loginUser) {
+            return loginUser;
+        }
+        return null;
+    }
+
+    /**
+     * 当前用户 ID，未登录返回 {@code null}。
+     */
+    public static Long currentUserIdOrNull() {
+        LoginUser loginUser = currentUserOrNull();
+        return loginUser == null ? null : loginUser.getId();
+    }
+
+    /**
+     * 当前用户是否具备指定的任一角色。
+     */
+    public static boolean hasAnyRole(String... roles) {
+        LoginUser loginUser = currentUserOrNull();
+        if (loginUser == null || loginUser.getRoles() == null) {
+            return false;
+        }
+        for (String role : roles) {
+            if (loginUser.getRoles().contains(role)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

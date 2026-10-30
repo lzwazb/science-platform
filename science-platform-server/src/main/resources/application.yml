@@ -45,7 +45,7 @@ mybatis-plus:
 # 前端实际使用 Vite 代理（/api -> http://localhost:8080），此配置用于直接联调的场景
 app:
   # 当前开发阶段，健康检查接口会返回，便于前端与答辩演示时确认进度
-  project-stage: 阶段 6：知识共建与审核
+  project-stage: 阶段 7：社区互动与内容反馈
 
   cors:
     allowed-origins:

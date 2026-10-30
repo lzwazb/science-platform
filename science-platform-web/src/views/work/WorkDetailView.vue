@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getWorkDetail } from '@/api/work'
+import InteractionBar from '@/components/InteractionBar.vue'
+import CommentSection from '@/components/CommentSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,7 +83,11 @@ onMounted(fetchDetail)
               <p>{{ work.creatorBio || '这位创作者还没有填写简介' }}</p>
             </div>
           </div>
+
+          <InteractionBar target-type="WORK" :target-id="work.id" class="work-interaction" />
         </footer>
+
+        <CommentSection target-type="WORK" :target-id="work.id" />
       </article>
 
       <section class="work-articles">
@@ -209,6 +215,10 @@ onMounted(fetchDetail)
   font-size: 12px;
   line-height: 1.7;
   color: var(--sp-text-muted);
+}
+
+.work-interaction {
+  margin-top: 16px;
 }
 
 .work-articles {
