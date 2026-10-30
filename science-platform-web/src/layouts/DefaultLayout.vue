@@ -51,9 +51,17 @@ async function handleLogout() {
 
         <nav class="app-nav">
           <RouterLink to="/" class="app-nav__item">首页</RouterLink>
-          <span class="app-nav__item app-nav__item--disabled" title="阶段 4 开放">知识库</span>
+          <RouterLink to="/knowledge" class="app-nav__item">知识库</RouterLink>
+          <RouterLink to="/topics" class="app-nav__item">专题</RouterLink>
           <span class="app-nav__item app-nav__item--disabled" title="阶段 5 开放">创意作品</span>
           <span class="app-nav__item app-nav__item--disabled" title="阶段 8 开放">主题活动</span>
+          <RouterLink
+            v-if="userStore.isAdmin"
+            to="/admin"
+            class="app-nav__item app-nav__item--admin"
+          >
+            后台管理
+          </RouterLink>
         </nav>
 
         <div class="app-user">
@@ -90,7 +98,7 @@ async function handleLogout() {
 
     <footer class="app-footer">
       <p>本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现</p>
-      <p class="app-footer__meta">阶段 3：登录与角色权限</p>
+      <p class="app-footer__meta">阶段 4：科普知识库</p>
     </footer>
   </div>
 </template>
@@ -195,6 +203,11 @@ async function handleLogout() {
 .app-nav__item--disabled:hover {
   background: transparent;
   color: var(--sp-text-faint);
+}
+
+.app-nav__item--admin {
+  color: var(--sp-primary-dark);
+  font-weight: 600;
 }
 
 .app-user {

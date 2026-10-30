@@ -9,7 +9,7 @@ import { useUserStore } from '@/stores/user'
  * meta 约定：
  *   requiresAuth  需要登录，未登录跳转 /login 并带回跳地址
  *   guestOnly     仅未登录可访问（登录、注册），已登录时回首页
- *   roles         需要的角色，任一命中即可
+ *   roles         需要的角色，任一命中即可；父级设置会被子级继承
  *
  * 注意：路由守卫只改善体验，真实授权在后端完成。
  */
@@ -23,6 +23,30 @@ const routes = [
         name: 'home',
         component: () => import('@/views/public/HomeView.vue'),
         meta: { title: '首页' },
+      },
+      {
+        path: 'knowledge',
+        name: 'knowledge',
+        component: () => import('@/views/knowledge/KnowledgeListView.vue'),
+        meta: { title: '知识库' },
+      },
+      {
+        path: 'knowledge/:id',
+        name: 'article-detail',
+        component: () => import('@/views/knowledge/ArticleDetailView.vue'),
+        meta: { title: '文章详情' },
+      },
+      {
+        path: 'topics',
+        name: 'topics',
+        component: () => import('@/views/knowledge/TopicListView.vue'),
+        meta: { title: '专题' },
+      },
+      {
+        path: 'topics/:id',
+        name: 'topic-detail',
+        component: () => import('@/views/knowledge/TopicDetailView.vue'),
+        meta: { title: '专题详情' },
       },
       {
         path: 'login',
@@ -41,6 +65,35 @@ const routes = [
         name: 'profile',
         component: () => import('@/views/user/ProfileView.vue'),
         meta: { title: '个人中心', requiresAuth: true },
+      },
+      {
+        path: 'admin',
+        component: () => import('@/layouts/AdminLayout.vue'),
+        meta: { requiresAuth: true, roles: ['ADMIN', 'SUPER_ADMIN'] },
+        children: [
+          {
+            path: '',
+            redirect: '/admin/articles',
+          },
+          {
+            path: 'articles',
+            name: 'admin-articles',
+            component: () => import('@/views/admin/AdminArticleView.vue'),
+            meta: { title: '文章管理' },
+          },
+          {
+            path: 'categories',
+            name: 'admin-categories',
+            component: () => import('@/views/admin/AdminCategoryView.vue'),
+            meta: { title: '分类管理' },
+          },
+          {
+            path: 'topics',
+            name: 'admin-topics',
+            component: () => import('@/views/admin/AdminTopicView.vue'),
+            meta: { title: '专题管理' },
+          },
+        ],
       },
     ],
   },

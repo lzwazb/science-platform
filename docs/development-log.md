@@ -527,3 +527,195 @@ BUILD SUCCESS
 3. 前端 `/knowledge`、`/knowledge/:id`、`/topics`、`/topics/:id`、`/admin/articles`、`/admin/categories`、`/admin/topics` 页面
 4. 静态资源目录落地（seed 中的 `/images/articles/*.svg` 封面），统一处理图片缺失的占位
 5. 补搜索与分页测试（T04），以及「游客可浏览已发布文章、看不到草稿」的权限测试
+
+---
+
+## 2026-10-30 · 阶段 4：科普知识库
+
+**目标**（开发档案第 11 章）：分类、文章、专题的浏览与搜索，后台文章维护，达成「游客可浏览已发布文章；管理员可维护」。
+
+### 1. 后端实现
+
+| 层 | 文件 | 说明 |
+| --- | --- | --- |
+| 实体 | `ScienceCategory` / `ScienceTopic` / `TopicArticle` | 与阶段 2 的建表语句一一对应 |
+| Mapper | `ScienceCategoryMapper` / `ScienceTopicMapper` / `TopicArticleMapper` | 均为 `BaseMapper` |
+| 公开查询 | `ArticleQueryService` | 分页、搜索、详情（阅读量 +1） |
+| 公开查询 | `CategoryService` / `TopicService` | 分类与专题，含后台 CRUD |
+| 后台维护 | `ArticleAdminService` | 创建、编辑、发布、下架、逻辑删除 |
+| 分页结构 | `common/PageResult` | 统一 `records/total/pageNum/pageSize` |
+| 控制器 | `ArticleController`、`CategoryController`、`TopicController` | 公开，游客可访问 |
+| 控制器 | `AdminArticleController`、`AdminCategoryController`、`AdminTopicController` | `@PreAuthorize` + 路径规则双重限制 |
+
+### 2. 几个刻意的实现选择
+
+**（1）列表组装用批量查询，不做 N+1**
+
+列表页需要分类名和作者昵称。逐条查询会变成 1 + 2N 次 SQL。改为：查出当页文章 → 收集 `categoryId` / `authorId` 集合 → 两次 `selectBatchIds` → 在内存里拼装，总共 3 次查询。
+
+**（2）关键词里的通配符要转义**
+
+`LIKE '%' + keyword + '%'` 里如果用户输入 `%`，会匹配全部记录。这不是 SQL 注入（查询已参数化），但搜索结果会莫名其妙。`escapeLike()` 把 `\ % _` 转义后再拼。实测 `keyword=%` 返回 0 条，而未转义时会返回全部 8 条。
+
+**（3）`PageResult` 而不是直接返回 `IPage`**
+
+MyBatis-Plus 的 `IPage` 字段名是 `current` / `size`，与档案 8.1 约定的 `pageNum` / `pageSize` 不一致。直接返回会让前端同时面对两套命名，所以加了一层转换。
+
+**（4）分类删除前检查引用**
+
+分类被文章引用时不允许删除，提示「该分类下还有 N 篇文章，请先移动文章或将分类改为停用」。物理删除会造成「文章还在但分类消失」的悬空引用；正确做法是改为 `DISABLED`。
+
+**（5）专题文章顺序取关联表的 sort_order**
+
+专题详情里的文章顺序不能用发布时间——专题是「按推荐顺序阅读」的。实测专题 2 返回 DNA(3) → 光合作用(4) → 疫苗(8)，这三篇的发布时间顺序不同，证明取的是 `sort_order`。
+
+**（6）编辑文章不改 `version_no`**
+
+版本号只在「知识贡献被采纳」的审核流程中递增。如果管理员手工编辑也涨版本号，`article_version` 里就会出现「没有对应贡献记录的空版本」，追溯链断裂。
+
+### 3. 验证（真实运行）
+
+#### 3.1 公开接口
+
+| 场景 | 实测 |
+| --- | --- |
+| 列表默认分页 | `total=8`、`pageNum=1`、`pageSize=3`、3 条记录 |
+| 按分类筛选 `categoryId=1` | `total=2`，两条都属于「天文宇宙」 |
+| 搜索 `DNA` | `total=1`，命中《DNA 双螺旋：生命如何储存信息》 |
+| 搜索 `%` | `total=0`（未转义会返回 8 条） |
+| 文章详情 | 返回分类名、作者、`versionNo=2`、所属专题「生命的密码：遗传与演化」 |
+| 阅读量递增 | 连续访问两次，`view_count` 由 2061 → 2062 |
+| 不存在的文章 | `404 文章不存在或未发布` |
+| 分类列表 | 6 个 ARTICLE 分类，按 sortOrder 排序 |
+| 专题列表 | 3 个专题，文章数分别 2 / 3 / 1 |
+| 专题详情 | 3 篇文章按 sort_order 排列 |
+
+#### 3.2 后台接口
+
+| 场景 | 实测 |
+| --- | --- |
+| 普通用户访问 `/admin/articles` | `403` |
+| 管理员查看后台列表 | `total=8` |
+| 创建文章 | `id=9`、`status=DRAFT`、`versionNo=1`、作者取自认证上下文 |
+| 草稿对前台 | 列表仍 8 篇，公开详情 `404` |
+| 发布 | `status=PUBLISHED`，`publishedAt=2026-10-30 13:41:05`，前台列表 9 篇 |
+| 重复发布 | `400 文章已是发布状态` |
+| 下架 | 前台列表回到 8 篇 |
+| 删除 | 逻辑删除成功 |
+| 创建分类 | `id=11`、`status=ENABLED` |
+| 同名分类 | `400 同一类型下已存在同名分类` |
+| 非法类型 | `400 type 分类类型只能是 ARTICLE 或 WORK` |
+| 停用分类后公开列表 | 公开分类数仍为 6（新分类未出现） |
+| 删除被引用分类 | `400 该分类下还有 2 篇文章……` |
+| 创建专题 | `id=4`、`status=PUBLISHED` |
+| 设置专题文章 `[5,6]` | `articleCount=2` |
+| 传不存在的文章 ID | `400 部分文章不存在`，且回滚后 `articleCount` 仍为 2 |
+| 删除专题 | 成功，关联一并清理 |
+
+测试产生的临时数据（文章 9、分类 11、专题 4）已从库中物理清理，文章 3 被测试增加的阅读量也改回 seed 值 2060，演示数据保持 8 篇 / 10 分类 / 3 专题 / 6 关联。
+
+#### 3.3 自动化测试
+
+```powershell
+mvn -s ..\maven-settings.xml test
+```
+
+```
+Tests run: 10, Failures: 0, Errors: 0  -- AuthAndSecurityTest
+Tests run: 5,  Failures: 0, Errors: 0  -- ArticlePaginationTest
+Tests run: 13, Failures: 0, Errors: 0  -- KnowledgeApiTest
+Tests run: 28, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+`KnowledgeApiTest` 类级加 `@Transactional`，每个用例结束自动回滚，测试期间插入的草稿与阅读量变化不会污染演示数据。覆盖 13 项：
+
+游客可浏览列表（含分页字段与「列表项无正文」断言）、T04 搜索与 `%` 转义、分类筛选、详情关联、阅读量递增、404、**草稿对游客不可见但后台可见**、普通用户 403、专题列表计数、专题详情顺序、分类只返回启用项、分页参数越界拦截、未发布专题 404。
+
+#### 3.4 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0，12 个页面各自独立 chunk |
+| 12 个新增模块编译 | ✅ 全部 200 |
+| 静态 SVG 封面 | ✅ 4 个抽样路径均 200，`Content-Type: image/svg+xml` |
+| 走代理取文章列表 | ✅ `total=8`，`coverUrl` 正确 |
+| SSR 渲染知识库列表页 | ✅ len=6400，含标题、搜索框、分类筛选 |
+| SSR 渲染专题列表页 | ✅ len=4577 |
+| SSR 渲染后台文章管理 | ✅ len=8604，含侧边栏、表格、新建按钮 |
+
+### 4. 静态资源
+
+`seed.sql` 里引用的封面路径此前不存在，本阶段用脚本生成了一批 SVG（`public/images/{articles,topics,works,events}/`），共 17 个：渐变底 + 抽象几何图形（星点、双螺旋、网格、同心圆、十字、六边形、波纹），按主题配色区分，不依赖外部图片与字体。
+
+生成时模板里混入了一行无效的 `<rect ... height="0" height="0"/>`，已批量清除并复查全部 17 个文件。
+
+### 5. 本阶段产出文件
+
+```
+后端新增：
+  modules/knowledge/entity/ScienceCategory.java
+  modules/knowledge/entity/ScienceTopic.java
+  modules/knowledge/entity/TopicArticle.java
+  modules/knowledge/mapper/ScienceCategoryMapper.java
+  modules/knowledge/mapper/ScienceTopicMapper.java
+  modules/knowledge/mapper/TopicArticleMapper.java
+  modules/knowledge/service/ArticleQueryService.java
+  modules/knowledge/service/ArticleAdminService.java
+  modules/knowledge/service/CategoryService.java
+  modules/knowledge/service/TopicService.java
+  modules/knowledge/dto/ArticleSaveRequest.java
+  modules/knowledge/dto/CategorySaveRequest.java
+  modules/knowledge/dto/TopicSaveRequest.java
+  modules/knowledge/dto/TopicArticlesRequest.java
+  modules/knowledge/vo/ArticleListItemVO.java
+  modules/knowledge/vo/ArticleDetailVO.java
+  modules/knowledge/vo/CategoryVO.java
+  modules/knowledge/vo/TopicVO.java
+  modules/knowledge/vo/TopicBriefVO.java
+  modules/knowledge/ArticleController.java
+  modules/knowledge/CategoryController.java
+  modules/knowledge/TopicController.java
+  modules/knowledge/AdminArticleController.java
+  modules/knowledge/AdminCategoryController.java
+  modules/knowledge/AdminTopicController.java
+  common/PageResult.java
+  src/test/java/.../KnowledgeApiTest.java（13 用例）
+
+前端新增：
+  src/api/article.js、category.js、topic.js
+  src/layouts/AdminLayout.vue
+  src/views/knowledge/KnowledgeListView.vue
+  src/views/knowledge/ArticleDetailView.vue
+  src/views/knowledge/TopicListView.vue
+  src/views/knowledge/TopicDetailView.vue
+  src/views/admin/AdminArticleView.vue
+  src/views/admin/AdminCategoryView.vue
+  src/views/admin/AdminTopicView.vue
+  public/images/**（17 个 SVG）
+
+修改：
+  前端 src/router/index.js（9 条新路由 + 后台角色守卫）
+  前端 src/layouts/DefaultLayout.vue（导航开放知识库/专题，新增后台入口）
+  后端 application.yml（project-stage 更新为阶段 4）
+```
+
+### 6. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 文章列表用 `LIKE '%关键词%'`，走不了前缀索引 | 演示规模无影响 | 论文「不足与展望」说明 |
+| 2 | 正文为纯文本，未接入富文本编辑器 | 与档案 P2 一致 | 视剩余时间决定 |
+| 3 | 封面图为本地 SVG 占位 | 答辩演示够用 | P2 可换真实图片上传 |
+| 4 | 详情页的「提交纠错」「点赞收藏」按钮为禁用占位 | 明确标注阶段 6/7 开放 | 按计划推进 |
+| 5 | 专题编排对话框一次最多取 100 篇文章 | 演示规模足够 | 数据量大时改为远程搜索 |
+
+### 7. 下一步建议
+
+进入**阶段 5：作品管理**：
+
+1. 作品实体、Mapper、Service（创建、编辑、删除、审核状态流转）
+2. 作品与文章关联（`work_article_relation`），详情页双向展示
+3. 后台作品审核接口（评审员操作），公开页面只展示 `PUBLISHED`
+4. 前端 `/works`、`/works/:id`、`/creator/works`、`/review/works` 页面
+5. 补「用户 A 不能修改用户 B 的作品」权限测试（T05）与「待审作品不出现在公开列表」测试

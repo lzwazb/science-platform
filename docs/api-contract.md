@@ -258,22 +258,137 @@ Authorization: Bearer <token>
 
 实测：`PUT` 非法邮箱返回 `400 email 邮箱格式不正确`。
 
+### 2.6 文章列表与搜索
+
+```
+GET /api/v1/articles?page=1&size=10&categoryId=&keyword=
+GET /api/v1/articles/search?keyword=&page=1&size=10
+```
+
+无需认证（游客可访问）。**只返回 `status = PUBLISHED` 且未删除的文章。**
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `page` | int | 1 | 页码，≥ 1 |
+| `size` | int | 10 | 每页条数，1–100 |
+| `categoryId` | long | — | 按分类筛选 |
+| `keyword` | string | — | 匹配标题或摘要 |
+
+排序：`published_at DESC, id DESC`（同一时间用 id 兜底，保证分页稳定）。
+
+**响应示例**（实测）：
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [
+      {
+        "id": 8,
+        "title": "疫苗为什么有效：一次预演换来长期记忆",
+        "summary": "疫苗通过引入安全的抗原……",
+        "coverUrl": "/images/articles/vaccine.svg",
+        "categoryId": 6,
+        "categoryName": "健康医学",
+        "authorId": 2,
+        "authorName": "内容管理员",
+        "status": "PUBLISHED",
+        "publishedAt": "2026-09-20 09:00:00",
+        "viewCount": 720,
+        "versionNo": 1
+      }
+    ],
+    "total": 8,
+    "pageNum": 1,
+    "pageSize": 3
+  },
+  "timestamp": "2026-10-30 13:40:48"
+}
+```
+
+**列表项不含 `content`**，避免列表接口返回大量长文本。
+
+**关键词转义**：`%`、`_`、`\` 会被转义后再拼进 LIKE。实测 `keyword=%` 返回 0 条而非全部 8 条。这不是防注入（查询已参数化），而是保证搜索结果符合用户预期。
+
+### 2.7 文章详情
+
+```
+GET /api/v1/articles/{id}
+```
+
+无需认证。返回正文、分类名、作者昵称、所属已发布专题。
+
+**副作用**：每次访问把 `view_count` +1（档案 FR-KB-03 的「阅读量」为可选项，此处做最小实现）。
+
+文章不存在、或状态不是 `PUBLISHED` → `404 文章不存在或未发布`。草稿与已下架文章对游客和普通用户都不可见。
+
+### 2.8 分类
+
+```
+GET /api/v1/categories?type=ARTICLE
+```
+
+无需认证。只返回 `status = ENABLED` 的分类，按 `sortOrder` 升序。`type` 可选，取 `ARTICLE` / `WORK`，为空返回全部类型。
+
+### 2.9 专题
+
+```
+GET /api/v1/topics        # 列表，附带 articleCount
+GET /api/v1/topics/{id}   # 详情，含按 sort_order 排列的文章
+```
+
+无需认证。只返回 `status = PUBLISHED` 的专题；专题内文章只含已发布文章。
+
+`articleCount` 统计的是**专题内已发布文章数**，不含草稿。专题详情里的文章顺序取 `topic_article.sort_order`，而不是文章发布时间——实测专题 2 返回顺序为 DNA(3) → 光合作用(4) → 疫苗(8)，与发布时间顺序不同。
+
+### 2.10 后台内容维护
+
+以下接口均需 `ADMIN` 或 `SUPER_ADMIN`。普通用户返回 403（实测）。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/admin/articles` | 文章列表，含草稿与已下架；支持 `status`、`categoryId`、`keyword` |
+| GET | `/api/v1/admin/articles/{id}` | 查看文章（允许草稿），不增加阅读量 |
+| POST | `/api/v1/admin/articles` | 创建文章，初始状态 `DRAFT` |
+| PUT | `/api/v1/admin/articles/{id}` | 编辑文章 |
+| POST | `/api/v1/admin/articles/{id}/publish` | 发布 |
+| POST | `/api/v1/admin/articles/{id}/offline` | 下架 |
+| DELETE | `/api/v1/admin/articles/{id}` | 删除（逻辑删除） |
+| GET | `/api/v1/admin/categories` | 分类列表，含已停用 |
+| POST | `/api/v1/admin/categories` | 创建分类 |
+| PUT | `/api/v1/admin/categories/{id}` | 编辑分类 |
+| DELETE | `/api/v1/admin/categories/{id}` | 删除分类 |
+| GET | `/api/v1/admin/topics` | 专题列表，含草稿 |
+| GET | `/api/v1/admin/topics/{id}` | 专题详情，含草稿文章 |
+| POST | `/api/v1/admin/topics` | 创建专题 |
+| PUT | `/api/v1/admin/topics/{id}` | 编辑专题 |
+| DELETE | `/api/v1/admin/topics/{id}` | 删除专题（同时清理关联） |
+| PUT | `/api/v1/admin/topics/{id}/articles` | 整体替换专题内文章，body 为 `{"articleIds": [5, 6]}` |
+
+**业务规则实测**：
+
+| 场景 | 结果 |
+| --- | --- |
+| 重复发布已发布文章 | `400 文章已是发布状态` |
+| 删除分类但分类下仍有文章 | `400 该分类下还有 2 篇文章，请先移动文章或将分类改为停用` |
+| 同一类型下创建同名分类 | `400 同一类型下已存在同名分类` |
+| 分类类型不是 ARTICLE/WORK | `400 type 分类类型只能是 ARTICLE 或 WORK` |
+| 给专题设置不存在的文章 ID | `400 部分文章不存在，请刷新后重试`，且**整体回滚**（原有关联不变） |
+| 新建文章后前台列表 | 仍为 8 篇，草稿不可见；公开详情 404 |
+| 发布后前台列表 | 变为 9 篇 |
+| 下架后前台列表 | 恢复 8 篇 |
+
+**编辑已发布文章不触发重新审核**：文章由管理员直接维护，与「作品编辑后需重新审核」的规则不同。
+**编辑文章不改 `version_no`**：版本号只在「知识贡献被采纳」的审核流程中递增（阶段 6），保证版本历史与审核记录一一对应。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
-（阶段 3 已实现认证与个人资料 5 个接口，见 2.2–2.5。）
+（阶段 3 已实现认证与个人资料 5 个接口，阶段 4 已实现知识库与后台内容维护 20 个接口，见 2.2–2.10。）
 
 | 模块 | 方法 | 路径 | 用途 | 计划阶段 |
 | --- | --- | --- | --- | --- |
-| 知识 | GET | `/articles` | 分页查询已发布文章 | 4 |
-| 知识 | GET | `/articles/{id}` | 查看文章详情 | 4 |
-| 知识 | GET | `/articles/search?keyword=` | 关键词搜索 | 4 |
-| 分类 | GET | `/categories?type=ARTICLE` | 公开分类列表 | 4 |
-| 专题 | GET | `/topics` | 专题列表 | 4 |
-| 专题 | GET | `/topics/{id}` | 专题详情及文章 | 4 |
-| 知识管理 | POST | `/admin/articles` | 管理员创建文章 | 4 |
-| 知识管理 | PUT | `/admin/articles/{id}` | 管理员修改文章 | 4 |
-| 知识管理 | POST | `/admin/articles/{id}/publish` | 发布文章 | 4 |
 | 知识贡献 | POST | `/contributions` | 提交知识贡献 | 6 |
 | 知识贡献 | GET | `/contributions/mine` | 查看本人贡献记录 | 6 |
 | 知识审核 | GET | `/reviews/contributions` | 查看待审核贡献 | 6 |
