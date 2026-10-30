@@ -42,4 +42,5 @@ Desktop.ini
 # ---------- 中间产物 ----------
 doc.docx
 doc.txt
+.tmp-tools/
 *.tmp

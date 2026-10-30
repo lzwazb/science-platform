@@ -30,7 +30,7 @@ import { RouterView } from 'vue-router'
 
     <footer class="app-footer">
       <p>本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现</p>
-      <p class="app-footer__meta">阶段 1：项目骨架与前后端连通性验证</p>
+      <p class="app-footer__meta">阶段 2：数据库与基础规范</p>
     </footer>
   </div>
 </template>

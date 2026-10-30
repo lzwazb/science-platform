@@ -1,7 +1,7 @@
 # 接口约定（API Contract）
 
 > 基线：开发档案第 8 章。本文件随阶段推进持续更新，**代码与本文档保持同步**。
-> 最后更新：2026-10-30（阶段 1）
+> 最后更新：2026-10-30（阶段 2）
 
 ## 1. 全局约定
 
@@ -58,6 +58,49 @@
 - 操作者身份**一律从后端认证上下文获取**，不接受前端传入 `reviewerId`、`roleCode` 等身份字段作为授权依据
 - 前端路由守卫只改善体验，真实授权在后端完成
 
+### 1.5 错误响应示例
+
+错误同样使用统一结构，`data` 为 `null`，`code` 与 HTTP 状态码一致。以下为阶段 2 实测输出。
+
+**404 · 访问不存在的路径**
+
+```json
+{
+  "code": 404,
+  "message": "请求的资源不存在",
+  "data": null,
+  "timestamp": "2026-10-30 13:21:19"
+}
+```
+
+**405 · 请求方法不支持**
+
+```json
+{
+  "code": 405,
+  "message": "不支持该请求方法：POST",
+  "data": null,
+  "timestamp": "2026-10-30 13:21:19"
+}
+```
+
+参数校验失败（阶段 3 起出现，由 Bean Validation 产生）：
+
+```json
+{
+  "code": 400,
+  "message": "username 不能为空；password 长度需在 6 到 32 之间",
+  "data": null,
+  "timestamp": "2026-10-30 13:21:19"
+}
+```
+
+多个字段错误用中文分号 `；` 连接，字段名沿用 DTO 属性名。
+
+**异常处理实现位置**：`science-platform-server/src/main/java/com/science/platform/common/exception/GlobalExceptionHandler.java`
+
+处理范围：业务异常、`@RequestBody` 校验、表单绑定校验、方法参数约束、缺少必填参数、参数类型不匹配、JSON 解析失败、方法不支持、路径不存在、兜底异常。兜底分支写完整堆栈到日志，对外只返回「服务端异常，请稍后重试」。
+
 ## 2. 已实现接口
 
 ### 2.1 健康检查
@@ -68,7 +111,7 @@ GET /api/v1/health
 
 无需认证。
 
-**响应示例**（实测输出，2026-10-30）：
+**响应示例**（实测输出，2026-10-30 13:21:12）：
 
 ```json
 {
@@ -78,12 +121,19 @@ GET /api/v1/health
     "status": "UP",
     "application": "science-platform-server",
     "project": "基于 Spring Boot + Vue 的科普知识共创与创意传播平台",
-    "stage": "阶段 1：项目骨架",
-    "serverTime": "2026-10-30 13:13:05"
+    "stage": "阶段 2：数据库与基础规范",
+    "serverTime": "2026-10-30 13:21:12",
+    "db": {
+      "status": "UP",
+      "database": "science_platform",
+      "publishedArticleCount": 8
+    }
   },
-  "timestamp": "2026-10-30 13:13:05"
+  "timestamp": "2026-10-30 13:21:12"
 }
 ```
+
+`db` 段为阶段 2 新增：每次调用真实执行一次 `SELECT COUNT(*)`，使健康检查能反映「服务在跑但数据库断开」的情况，而不是只证明进程存活。
 
 **实现位置**：`science-platform-server/src/main/java/com/science/platform/modules/system/HealthController.java`
 
@@ -144,3 +194,26 @@ GET /api/v1/health
 - Axios 实例：`science-platform-web/src/api/request.js`，`baseURL = '/api/v1'`，超时 10s
 - 响应拦截器自动解包 `{ code, message, data }`，业务代码直接拿到 `data`
 - 开发期由 Vite 代理把 `/api` 转发到 `http://localhost:8080`（见 `vite.config.js`），业务代码中**不允许**硬编码后端地址
+
+## 5. 分页实现约定（阶段 2 起）
+
+后端使用 MyBatis-Plus `PaginationInnerInterceptor`，配置位置 `config/MybatisPlusConfig.java`：
+
+| 配置 | 取值 | 理由 |
+| --- | --- | --- |
+| `maxLimit` | 100 | 防止前端传入超大 `size` 拖垮数据库 |
+| `overflow` | false | 页码超出总页数时返回空列表，不回落到首页，避免分页行为难以预期 |
+| 数据库类型 | MYSQL | 生成 `LIMIT` 分页 SQL |
+
+请求参数统一为 `page`（从 1 开始）、`size`（默认 10），响应 `data` 结构为：
+
+```json
+{
+  "records": [],
+  "total": 8,
+  "pageNum": 1,
+  "pageSize": 3
+}
+```
+
+阶段 2 已通过 `ArticlePaginationTest` 实测：8 条已发布数据按 `size=3` 分页，首页 3 条、末页 2 条、页码 10 返回空列表且 `total` 仍为 8——若分页插件未生效，首页会返回全部 8 条，测试即失败。

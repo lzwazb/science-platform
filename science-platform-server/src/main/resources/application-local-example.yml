@@ -1,0 +1,6 @@
+# 本地开发配置（不要提交到 Git，已被 .gitignore 忽略）
+# 复制本文件为 application-local.yml 并填写本机数据库密码
+spring:
+  datasource:
+    username: root
+    password: 你的数据库密码

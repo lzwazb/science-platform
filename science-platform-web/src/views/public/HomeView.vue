@@ -96,6 +96,15 @@ onMounted(checkBackend)
         <el-descriptions-item label="应用名称">{{ health.application }}</el-descriptions-item>
         <el-descriptions-item label="当前阶段">{{ health.stage }}</el-descriptions-item>
         <el-descriptions-item label="检测时间">{{ checkedAt }}</el-descriptions-item>
+        <el-descriptions-item label="数据库">
+          <el-tag :type="health.db?.status === 'UP' ? 'success' : 'danger'" size="small">
+            {{ health.db?.status === 'UP' ? '已连接' : '异常' }}
+          </el-tag>
+          <span class="status-card__db-name">{{ health.db?.database }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="已发布文章">
+          {{ health.db?.publishedArticleCount }} 篇
+        </el-descriptions-item>
       </el-descriptions>
     </section>
 
@@ -193,6 +202,12 @@ onMounted(checkBackend)
 
 .status-card__detail {
   margin-top: 16px;
+}
+
+.status-card__db-name {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--sp-text-muted);
 }
 
 .modules {
