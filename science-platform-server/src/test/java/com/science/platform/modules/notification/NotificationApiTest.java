@@ -204,21 +204,23 @@ class NotificationApiTest {
         String superToken = token("superadmin");
         String userToken = token("user01");
 
-        // 分配前：普通用户不能访问创作者中心
-        mockMvc.perform(get("/api/v1/creator/works").header("Authorization", "Bearer " + userToken))
+        // 验证点选「审核工作台」而不是「创作者中心」：
+        // 创作者中心对任何登录用户开放，不再能体现角色变化；
+        // 评审台仍然限 REVIEWER 及以上，适合用来观察权限是否实时生效
+        mockMvc.perform(get("/api/v1/review/works").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(put("/api/v1/admin/users/" + USER01_ID + "/roles")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "roleCodes", List.of("USER", "CREATOR"),
+                                "roleCodes", List.of("USER", "REVIEWER"),
                                 "reason", "测试角色分配")))
                         .header("Authorization", "Bearer " + superToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.roles").isArray());
 
         // 分配后：同一个旧令牌立刻可用（因为过滤链每请求查库取角色）
-        mockMvc.perform(get("/api/v1/creator/works").header("Authorization", "Bearer " + userToken))
+        mockMvc.perform(get("/api/v1/review/works").header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk());
     }
 

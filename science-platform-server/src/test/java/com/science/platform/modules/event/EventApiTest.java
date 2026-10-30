@@ -205,13 +205,47 @@ class EventApiTest {
     }
 
     @Test
-    @DisplayName("普通用户不能投稿")
-    void normalUserCannotSubmit() throws Exception {
+    @DisplayName("普通用户可以创建作品并参加活动，不再因缺少 CREATOR 角色被拒")
+    void normalUserCanCreateWorkAndSubmit() throws Exception {
+        String userToken = token("user01");
+
+        // 第一步：普通用户现在可以进入创作者中心
+        mockMvc.perform(get("/api/v1/creator/works").header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk());
+
+        // 第二步：普通用户可以创建作品（创建后为草稿）
+        MvcResult created = mockMvc.perform(post("/api/v1/creator/works")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "【测试】普通用户的作品",
+                                "description", "验证普通用户也能参与创作",
+                                "content", "这件作品用于验证普通用户不再被角色拦住。",
+                                "categoryId", 7)))
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        long workId = readJson(created).path("data").path("id").asLong();
+
+        // 第三步：投稿不再返回 403。草稿作品会被业务规则挡下（400），
+        // 这正说明拦住它的是「作品未发布」而不是「没有权限」
+        mockMvc.perform(post("/api/v1/events/" + ONGOING_EVENT + "/submissions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workId\":" + workId + "}")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("只有已发布的作品可以投稿")));
+    }
+
+    @Test
+    @DisplayName("普通用户投稿他人作品仍被拒绝")
+    void normalUserCannotSubmitOthersWork() throws Exception {
         mockMvc.perform(post("/api/v1/events/" + ONGOING_EVENT + "/submissions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"workId\":" + WORK_OF_CREATOR01 + "}")
                         .header("Authorization", "Bearer " + token("user01")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("只能提交自己的作品"));
     }
 
     @Test

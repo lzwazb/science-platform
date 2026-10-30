@@ -25,7 +25,7 @@ const roleLabels = {
   SUPER_ADMIN: '超级管理员',
 }
 
-const canCreate = computed(() => userStore.hasAnyRole(['CREATOR', 'ADMIN', 'SUPER_ADMIN']))
+// 创作不设角色门槛：任何登录用户都可以有作品，作品能否公开由审核决定
 
 // ---------------- 概况 ----------------
 
@@ -34,7 +34,7 @@ const statCards = computed(() => {
   if (!o) return []
   return [
     { key: 'contribution', label: '知识贡献', value: o.contributionCount, hint: `${o.pendingContributionCount} 条待审核 · ${o.approvedContributionCount} 条已采纳`, to: '/contributions/mine' },
-    { key: 'work', label: '创意作品', value: o.workCount, hint: `${o.publishedWorkCount} 件已发布`, to: '/creator/works', visible: canCreate.value },
+    { key: 'work', label: '创意作品', value: o.workCount, hint: `${o.publishedWorkCount} 件已发布`, to: '/creator/works' },
     { key: 'favorite', label: '收藏', value: o.favoriteCount, hint: '文章与作品', to: '/favorites' },
     { key: 'submission', label: '活动投稿', value: o.submissionCount, hint: '参与过的主题活动', to: '/events' },
     { key: 'feedback', label: '内容反馈', value: o.feedbackCount, hint: '提交的反馈', to: '/notifications', visible: false },
@@ -216,7 +216,7 @@ onMounted(async () => {
       </el-tab-pane>
 
       <!-- 我的作品 -->
-      <el-tab-pane v-if="canCreate" label="我的作品" name="work">
+      <el-tab-pane label="我的作品" name="work">
         <div v-loading="tabLoading">
           <el-empty v-if="works.length === 0" description="还没有作品" :image-size="70" />
           <el-table v-else :data="works" border size="small">

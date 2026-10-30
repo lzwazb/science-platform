@@ -2031,3 +2031,112 @@ records.forEach(node -> assertTrue(node.path("id").asLong() != PENDING_WORK_ID))
   docs/api-contract.md              （2.26 补 /site/stats 与统计口径）
   docs/development-log.md           （本节）
 ```
+
+---
+
+## 2026-10-30 · 权限调整：普通用户可以参与创作与活动投稿
+
+**反馈**：普通用户在活动里提交作品时提示「没有权限执行该操作」。
+
+### 1. 问题定位
+
+限制卡在两层，而且是个连锁：
+
+```
+普通用户点「提交作品参赛」
+  → 弹窗里要选作品
+  → 但普通用户从来没机会创建作品（/creator/** 403）
+  → 即使强行投稿，接口本身也要求 CREATOR（403）
+```
+
+原来的权限规则：
+
+```java
+.requestMatchers("/api/v1/creator/**").hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
+.requestMatchers(HttpMethod.POST, "/api/v1/events/*/submissions")
+        .hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
+```
+
+`@PreAuthorize("hasAnyRole('CREATOR', 'ADMIN', 'SUPER_ADMIN')")` 在
+`CreatorWorkController` 和 `EventSubmissionController` 上也各写了一份。
+
+### 2. 判断：这里不该设角色门槛
+
+平台叫「科普知识**共创**与创意传播」，「参与创作」和「参加活动」是普通用户的正当权益，
+不是少数人的特权。
+
+而且**安全边界本来就不在这**：作品创建后是 `DRAFT`，必须提交审核、
+由评审员通过才变 `PUBLISHED`，之后才能公开、才能用于活动投稿。
+真正把关的是审核流程，不是「你有没有 CREATOR 角色」。
+
+所以调整：
+
+| 路径 | 原来 | 现在 |
+| --- | --- | --- |
+| `/api/v1/creator/**` | `CREATOR` / `ADMIN` / `SUPER_ADMIN` | **`isAuthenticated()`** |
+| `POST /events/{id}/submissions` | 同上 | **`isAuthenticated()`** |
+
+`CREATOR` 角色保留但不再承担功能权限，降级为「认证创作者」的展示标识。
+
+### 3. 越权防护没有松动
+
+放开的是「谁能创作」，没放开「能操作谁的作品」：
+
+| 场景 | 结果 |
+| --- | --- |
+| 投稿他人作品 | `403 只能提交自己的作品` |
+| 未发布作品投稿 | `400 只有已发布的作品可以投稿`（业务规则，不是权限） |
+| 普通用户访问审核台 | `403` |
+| 普通用户访问后台 | `403` |
+| 未登录访问创作者中心 | `401` |
+
+### 4. 完整链路实测（user01，只有 USER 角色）
+
+```
+【0】角色确认：USER
+【1】进入创作者中心              HTTP 200，我的作品 0 件
+【2】创建作品                    HTTP 200，作品 #27 状态 DRAFT
+【3】提交审核                    HTTP 200，状态 PENDING
+【4】未通过就投稿                HTTP 400 只有已发布的作品可以投稿  ← 不是 403
+【5】评审员审核通过              HTTP 200，状态 PUBLISHED
+【6】再次投稿活动                HTTP 200，投稿 #22
+【7】我的投稿                    HTTP 200，1 条，状态 SUBMITTED
+【8】收到通知                    审核结果已送达
+【9】投稿他人作品                HTTP 403 只能提交自己的作品
+【10】访问审核台                 HTTP 403
+【11】访问后台                   HTTP 403
+```
+
+第 4 步是关键：**拦住它的是「作品未发布」而不是「没有权限」**，
+说明角色限制确实去掉了，业务规则还在。
+
+### 5. 连带修改的旧断言
+
+权限一放开，三条旧测试立刻失效，逐一更新：
+
+| 原测试 | 处理 |
+| --- | --- |
+| `EventApiTest.normalUserCannotSubmit`（普通用户投稿 403） | 改为 `normalUserCanCreateWorkAndSubmit`：创建作品 → 提交审核 → 投稿，验证不再是 403 |
+| `WorkApiTest.normalUserCannotAccessCreatorCenter`（403） | 改为 `normalUserCanAccessCreatorCenter`（200），另加一条「未登录 401」 |
+| `NotificationApiTest.roleChangeTakesEffectImmediately` | 原来用 `/creator/works` 观察角色变化，现在这条路径对所有人开放，改用 `/review/works`（加 REVIEWER 后 403→200） |
+
+> 第 3 条是个提醒：**用某个接口验证「角色生效」时，要选那个角色真正的边界**。
+> 权限一放宽，原来的验证点就失效了。
+
+### 6. 前端配套
+
+| 文件 | 改动 |
+| --- | --- |
+| `layouts/DefaultLayout.vue` | 「创作者中心」入口从 `canCreate` 改为 `isLoggedIn`，删掉不再使用的 `canCreate` |
+| `views/user/ProfileView.vue` | 「我的作品」tab 与统计卡片对所有登录用户可见 |
+| `views/event/EventDetailView.vue` | 投稿弹窗空态文案改为「先在创作者中心创作一件，通过审核发布后就能参加活动」 |
+
+### 7. 验证
+
+```
+后端测试   Tests run: 128, Failures: 0, Errors: 0（原 126 + 新增 2）
+前端构建   ✓ built
+手工链路   11 步全通过（见上）
+```
+
+测试完成后已用 `seed.sql` 重置演示数据。

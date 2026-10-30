@@ -23,7 +23,7 @@ const primaryRoleLabel = computed(() => {
 })
 
 /** 能否进入创作者中心 */
-const canCreate = computed(() => userStore.hasAnyRole(['CREATOR', 'ADMIN', 'SUPER_ADMIN']))
+// 创作不再需要特定角色：任何登录用户都能创作，作品能否公开由审核决定
 
 async function handleLogout() {
   try {
@@ -80,7 +80,7 @@ async function handleLogout() {
             消息
           </RouterLink>
           <RouterLink
-            v-if="canCreate"
+            v-if="userStore.isLoggedIn"
             to="/creator/works"
             class="app-nav__item"
           >

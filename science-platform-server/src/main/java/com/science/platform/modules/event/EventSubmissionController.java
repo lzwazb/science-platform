@@ -22,7 +22,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/events")
-@PreAuthorize("hasAnyRole('CREATOR', 'ADMIN', 'SUPER_ADMIN')")
+@PreAuthorize("isAuthenticated()")
 public class EventSubmissionController {
 
     private final EventSubmissionService submissionService;

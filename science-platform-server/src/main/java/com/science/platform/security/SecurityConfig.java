@@ -81,11 +81,13 @@ public class SecurityConfig {
                         .hasRole("SUPER_ADMIN")
                         // 其余后台接口需要管理员及以上
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                        // 创作者中心：创作者、管理员、超级管理员
-                        .requestMatchers("/api/v1/creator/**").hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
-                        // 投稿：创作者及以上
-                        .requestMatchers(HttpMethod.POST, "/api/v1/events/*/submissions")
-                        .hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
+                        // 创作者中心：任何已登录用户都可以创作、管理自己的作品。
+                        // 作品是否公开由审核流程决定（PENDING → PUBLISHED），
+                        // 所以「谁能创作」不构成安全边界，真正的把关在审核台。
+                        .requestMatchers("/api/v1/creator/**").authenticated()
+                        // 活动投稿：任何已登录用户都可以参加，
+                        // 平台定位是「科普共创」，参与活动是普通用户的正当权益
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events/*/submissions").authenticated()
                         // 审核工作台：评审员、管理员、超级管理员
                         .requestMatchers("/api/v1/review/**").hasAnyRole("REVIEWER", "ADMIN", "SUPER_ADMIN")
                         .anyRequest().authenticated())

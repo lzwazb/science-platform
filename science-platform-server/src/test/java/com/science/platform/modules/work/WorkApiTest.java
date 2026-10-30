@@ -130,11 +130,18 @@ class WorkApiTest {
     // ---------- 权限 ----------
 
     @Test
-    @DisplayName("普通用户访问创作者中心返回 403")
-    void normalUserCannotAccessCreatorCenter() throws Exception {
+    @DisplayName("普通用户可以进入创作者中心（创作不设角色门槛，审核才是把关）")
+    void normalUserCanAccessCreatorCenter() throws Exception {
         mockMvc.perform(get("/api/v1/creator/works")
                         .header("Authorization", "Bearer " + token("user01")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("未登录访问创作者中心返回 401")
+    void guestCannotAccessCreatorCenter() throws Exception {
+        mockMvc.perform(get("/api/v1/creator/works"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/v1/creator/works")
-@PreAuthorize("hasAnyRole('CREATOR', 'ADMIN', 'SUPER_ADMIN')")
+@PreAuthorize("isAuthenticated()")
 public class CreatorWorkController {
 
     private final WorkService workService;

@@ -212,7 +212,7 @@ onMounted(fetchDetail)
       <div v-loading="worksLoading">
         <el-empty
           v-if="!worksLoading && availableWorks.length === 0"
-          description="没有可投稿的作品，请先在创作者中心发布作品"
+          description="没有可投稿的作品。先在创作者中心创作一件，通过审核发布后就能参加活动"
           :image-size="70"
         />
 
