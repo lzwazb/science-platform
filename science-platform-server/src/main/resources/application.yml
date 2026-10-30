@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: science-platform-server
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: always
+
+# 开发期跨域：允许本地 Vite 开发服务器访问
+# 前端实际使用 Vite 代理（/api -> http://localhost:8080），此配置用于直接联调的场景
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+
+logging:
+  level:
+    com.science.platform: DEBUG

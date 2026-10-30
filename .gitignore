@@ -1,0 +1,45 @@
+# ---------- Java / Maven ----------
+target/
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+.m2repo/
+*.log
+
+# ---------- Node / 前端 ----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- IDE ----------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ---------- 本地配置（禁止提交真实密码/密钥） ----------
+application-local.yml
+application-local.yaml
+application-prod.yml
+.env
+.env.local
+.env.*.local
+
+# ---------- 系统文件 ----------
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ---------- 中间产物 ----------
+doc.docx
+doc.txt
+*.tmp

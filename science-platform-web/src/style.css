@@ -1,0 +1,63 @@
+/* ---------- 全局基础样式与主题变量（蓝白科技风，开发档案 9.1） ---------- */
+:root {
+  --sp-primary: #409eff;
+  --sp-primary-dark: #2a7bd6;
+  --sp-primary-soft: #ecf5ff;
+  --sp-text-strong: #1f2733;
+  --sp-text: #3f4a58;
+  --sp-text-muted: #6b7684;
+  --sp-text-faint: #a3adb9;
+  --sp-border: #e4ecf5;
+  --sp-bg: #f6f9fd;
+
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--sp-text);
+  background-color: var(--sp-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--sp-bg);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--sp-primary-dark);
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+}
+
+/* 统一滚动条样式，避免演示时出现突兀的默认滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cfdbe8;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b3c4d6;
+}
