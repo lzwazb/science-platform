@@ -719,3 +719,180 @@ BUILD SUCCESS
 3. 后台作品审核接口（评审员操作），公开页面只展示 `PUBLISHED`
 4. 前端 `/works`、`/works/:id`、`/creator/works`、`/review/works` 页面
 5. 补「用户 A 不能修改用户 B 的作品」权限测试（T05）与「待审作品不出现在公开列表」测试
+
+---
+
+## 2026-10-30 · 阶段 5：作品管理与知识关联
+
+**目标**（开发档案第 11 章）：作品 CRUD、分类、知识关联、审核状态，达成「作者只能修改自己的作品；公开页面不显示待审作品」。
+
+### 1. 后端实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `work/entity/CreatorWork`、`WorkArticleRelation` | 作品与关联表实体 |
+| `work/mapper/CreatorWorkMapper` | 含一条原生查询 `countEventSubmissions`，用于删除前校验活动引用 |
+| `work/service/WorkQueryService` | 公开列表/详情（阅读量 +1）、我的作品、审核列表、文章↔作品双向关联 |
+| `work/service/WorkService` | 创作者写操作：创建、编辑、提交审核、删除、改关联 |
+| `work/service/WorkReviewService` | 审核：通过、驳回、下架 |
+| `work/WorkController` | 公开，游客可访问 |
+| `work/CreatorWorkController` | `/api/v1/creator/works`，`CREATOR` 及以上 |
+| `work/WorkReviewController` | `/api/v1/review/works`，`REVIEWER` 及以上 |
+| `knowledge/vo/ArticleDetailVO` | 新增 `works` 字段 |
+| `knowledge/service/ArticleQueryService` | 详情里填充关联作品 |
+| `security/SecurityConfig` | 新增 `/creator/**` 与 `/review/**` 两条授权规则 |
+
+**路径调整（与档案 8.3 的偏离及理由）**：档案把「创建作品」写在 `POST /api/v1/works`。本次改为 `/api/v1/creator/works`。
+原因：`/api/v1/works/**` 在安全配置中已作为**公开前缀**放行，把写操作放在同一前缀下，无法用路径规则表达「读公开、写需角色」，只能在每个方法上单独判断。拆到 `/creator/**` 后整块路径统一加角色限制，语义更清楚。此偏离已记录在 `api-contract.md`。
+
+### 2. 一个必须记录下来的坑：MyBatis-Plus 的 null 字段策略
+
+**现象**：作品被驳回后作者重新提交，`status` 变成 `PENDING`，但 `reviewComment`（上一条驳回意见）**没有被清空**，前端仍然显示「请补充数据来源」这种过期意见。
+
+**原因**：`updateById(entity)` 默认字段策略是 `FieldStrategy.NOT_NULL`，实体里设为 `null` 的字段会被**直接跳过**，不进 SET 子句。所以 `work.setReviewComment(null)` 等于什么都没做。
+
+**修复**：改用 `LambdaUpdateWrapper` 逐列 `set()`，null 才会真正写成 SQL NULL：
+
+```java
+LambdaUpdateWrapper<CreatorWork> wrapper = new LambdaUpdateWrapper<>();
+wrapper.eq(CreatorWork::getId, id)
+        .set(CreatorWork::getStatus, status)
+        .set(CreatorWork::getReviewerId, reviewerId)
+        .set(CreatorWork::getReviewComment, comment)   // 可为 null
+        .set(CreatorWork::getReviewedAt, reviewedAt)
+        .set(CreatorWork::getUpdatedAt, LocalDateTime.now());
+workMapper.update(null, wrapper);
+```
+
+**验证**：修复后重新执行「驳回 → 重新提交」，接口返回的 `reviewComment` 与 `reviewedAt` 均为 `null`（测试断言 `isNull()`）。同一处逻辑也用在「编辑已发布作品回 PENDING」与「无意见通过」上。
+
+> 这个坑对阶段 6 同样重要：知识贡献审核时会清空/写入多个可空字段（`reviewer_id`、`review_comment`、`reviewed_at`、`final_content`），必须用同样的写法。
+
+### 3. 验证（真实运行）
+
+#### 3.1 公开接口
+
+| 场景 | 实测 |
+| --- | --- |
+| 公开作品列表 | `total=3`，全部 `PUBLISHED`，每条带关联文章数 |
+| 作品详情 | 作者昵称「青柠手绘」、简介、分类「科普图文」、关联文章《碳循环与碳中和：地球的收支账》 |
+| 待审作品 4 的公开详情 | `404 作品不存在或未发布` |
+| 文章 7 详情的 `works` | 返回「碳足迹的一天：从早餐到熄灯」 |
+
+#### 3.2 创作者与权限
+
+| 场景 | 实测 |
+| --- | --- |
+| 普通用户访问 `/creator/works` | `403` |
+| 创作者访问 `/review/works` | `403` |
+| creator01 我的作品 | `total=2`，均为本人作品 |
+| 创建作品（关联文章 1、2） | `id=5`、`status=DRAFT`、`articles` 2 篇 |
+| **creator02 修改 creator01 的作品** | `403 只能操作自己的作品` |
+| **creator02 查看 creator01 的作品** | `403 只能查看自己的作品` |
+| **creator02 删除 creator01 的作品** | `403 只能操作自己的作品` |
+| 重复提交审核 | `400 作品已在审核中，请勿重复提交` |
+| 待审作品在公开列表 | `total` 仍为 3 |
+
+#### 3.3 审核流程
+
+| 场景 | 实测 |
+| --- | --- |
+| 评审待审列表 | 默认只返回 `PENDING`，含创作者名 |
+| 驳回不填意见 | `400 驳回时必须填写审核意见` |
+| 驳回填意见 | `status=REJECTED`，意见写入 |
+| 作者查看自己的驳回作品 | 能看到状态与意见 |
+| 重新提交 | `status=PENDING`，`reviewComment=null`、`reviewedAt=null` |
+| 无意见通过 | `status=PUBLISHED`，`reviewComment=null` |
+| 发布后公开列表 | `total` 由 3 变 4 |
+| 编辑已发布作品 | 自动变 `PENDING`，公开列表回到 3，上一轮意见清空 |
+| 下架已发布作品 | `status=OFFLINE`，公开详情 404 |
+| 非待审状态再次审核 | `400 该作品当前状态为已发布，不能进行审核` |
+| 删除被活动投稿引用的作品 3 | `400 该作品已被 1 个活动投稿引用，不能删除` |
+| 关联未发布文章 | `400 只能关联已发布的科普文章` |
+| 作品分类误选文章分类 | `400 所选分类不是作品分类` |
+
+测试产生的临时作品（5、6）已物理清理，作品 3 的浏览量保持 seed 值。当前库中：4 件作品（3 已发布 + 1 待审）、5 条关联。
+
+#### 3.4 自动化测试
+
+```
+Tests run: 10  AuthAndSecurityTest
+Tests run: 5   ArticlePaginationTest
+Tests run: 13  KnowledgeApiTest
+Tests run: 18  WorkApiTest
+Tests run: 46, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+`WorkApiTest` 覆盖 18 项：公开列表只含已发布、待审作品前台 404、详情关联、文章反向关联、普通用户 403、创作者 403、**T05 越权三连（查/改/删）**、我的作品按归属过滤、完整生命周期、重复提交、驳回意见必填 + 重新提交清空、编辑已发布回 PENDING、非待审不可审核、活动引用不可删、关联未发布文章被拒、分类类型校验、下架后不可见、审核列表默认 PENDING。
+
+#### 3.5 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0，15 个页面各自独立 chunk |
+| 6 个新增模块编译 | ✅ 全部 200 |
+| 走代理取作品列表 | ✅ `total=3`，`coverUrl` 正确 |
+| SSR 渲染作品列表 | ✅ len=6623，含标题与「我是创作者」入口 |
+| SSR 渲染作品详情 | ✅ len=2066 |
+| SSR 渲染创作者中心 | ✅ len=6589，含「新建作品」 |
+| SSR 渲染审核工作台 | ✅ len=7529，含表格 |
+
+### 4. 本阶段产出文件
+
+```
+后端新增：
+  work/entity/CreatorWork.java
+  work/entity/WorkArticleRelation.java
+  work/mapper/CreatorWorkMapper.java（含 countEventSubmissions）
+  work/mapper/WorkArticleRelationMapper.java
+  work/dto/WorkSaveRequest.java
+  work/dto/WorkReviewRequest.java
+  work/vo/WorkListItemVO.java
+  work/vo/WorkDetailVO.java
+  work/vo/WorkBriefVO.java
+  work/vo/ArticleBriefVO.java
+  work/service/WorkQueryService.java
+  work/service/WorkService.java
+  work/service/WorkReviewService.java
+  work/WorkController.java
+  work/CreatorWorkController.java
+  work/WorkReviewController.java
+  src/test/java/.../WorkApiTest.java（18 用例）
+
+后端修改：
+  knowledge/vo/ArticleDetailVO.java（新增 works 字段）
+  knowledge/service/ArticleQueryService.java（填充关联作品）
+  security/SecurityConfig.java（/creator/**、/review/** 规则）
+
+前端新增：
+  src/api/work.js
+  src/views/work/WorkListView.vue
+  src/views/work/WorkDetailView.vue
+  src/views/creator/CreatorWorksView.vue
+  src/views/review/ReviewWorksView.vue
+
+前端修改：
+  src/router/index.js（4 条新路由 + 角色守卫）
+  src/layouts/DefaultLayout.vue（导航开放创意作品、创作者中心、作品审核）
+  src/views/knowledge/ArticleDetailView.vue（相关作品从占位改为真实数据）
+```
+
+### 5. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 作品只有逻辑删除，没有「作者下架自己作品」的入口 | 档案未强制要求 | 可加 `POST /creator/works/{id}/offline` |
+| 2 | 关联文章选择器一次取 100 篇 | 演示规模够用 | 数据量大时改远程搜索 |
+| 3 | 驳回后没有站内通知 | 阶段 6/9 统一做通知 | 阶段 9 |
+| 4 | 审核操作未写 `sys_operation_log` | 阶段 9 补 | 阶段 9 |
+
+### 6. 下一步建议
+
+进入**阶段 6：知识共建核心**（项目最核心的模块）：
+
+1. 知识贡献提交、我的贡献、审核工作台（列表/详情/通过/驳回）
+2. **审核通过的事务**：读取当前文章 → 写历史版本快照 → 更新正文与 `version_no` → 贡献置 APPROVED → 写审核记录 → 生成站内通知，全部在一个事务内
+3. 版本历史接口（列表、指定版本详情）
+4. 前端 `/contributions/mine`、`/review/contributions`、文章详情的纠错入口、版本历史展示
+5. 补测试：T06 缺少建议内容、T07 驳回、T08 通过并生成版本、T09 事务回滚

@@ -46,4 +46,7 @@ public class ArticleDetailVO {
 
     /** 所属专题（简要信息） */
     private List<TopicBriefVO> topics;
+
+    /** 关联的已发布创意作品（阶段 5 起填充，体现「知识与作品关联」） */
+    private List<com.science.platform.modules.work.vo.WorkBriefVO> works;
 }

@@ -22,6 +22,9 @@ const primaryRoleLabel = computed(() => {
   return matched ? roleLabels[matched] : ''
 })
 
+/** 能否进入创作者中心 */
+const canCreate = computed(() => userStore.hasAnyRole(['CREATOR', 'ADMIN', 'SUPER_ADMIN']))
+
 async function handleLogout() {
   try {
     await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', {
@@ -53,8 +56,22 @@ async function handleLogout() {
           <RouterLink to="/" class="app-nav__item">首页</RouterLink>
           <RouterLink to="/knowledge" class="app-nav__item">知识库</RouterLink>
           <RouterLink to="/topics" class="app-nav__item">专题</RouterLink>
-          <span class="app-nav__item app-nav__item--disabled" title="阶段 5 开放">创意作品</span>
+          <RouterLink to="/works" class="app-nav__item">创意作品</RouterLink>
           <span class="app-nav__item app-nav__item--disabled" title="阶段 8 开放">主题活动</span>
+          <RouterLink
+            v-if="canCreate"
+            to="/creator/works"
+            class="app-nav__item"
+          >
+            创作者中心
+          </RouterLink>
+          <RouterLink
+            v-if="userStore.canReview"
+            to="/review/works"
+            class="app-nav__item"
+          >
+            作品审核
+          </RouterLink>
           <RouterLink
             v-if="userStore.isAdmin"
             to="/admin"
@@ -98,7 +115,7 @@ async function handleLogout() {
 
     <footer class="app-footer">
       <p>本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现</p>
-      <p class="app-footer__meta">阶段 4：科普知识库</p>
+      <p class="app-footer__meta">阶段 5：作品管理与知识关联</p>
     </footer>
   </div>
 </template>

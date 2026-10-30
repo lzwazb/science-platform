@@ -122,10 +122,33 @@ onMounted(fetchDetail)
         </footer>
       </article>
 
-      <!-- 阶段 5 起填充关联创意作品，此处先占位 -->
+      <!-- 关联创意作品（阶段 5 起） -->
       <section class="article-related">
         <h2 class="article-related__title">相关创意作品</h2>
-        <el-empty description="创意作品模块将在阶段 5 开放" :image-size="80" />
+
+        <el-empty
+          v-if="!article.works?.length"
+          description="还没有创作者为这篇文章创作作品"
+          :image-size="80"
+        />
+
+        <div v-else class="article-related__list">
+          <RouterLink
+            v-for="work in article.works"
+            :key="work.id"
+            :to="`/works/${work.id}`"
+            class="article-work-card"
+          >
+            <div v-if="work.coverUrl" class="article-work-card__cover">
+              <img :src="work.coverUrl" :alt="work.title" loading="lazy" />
+            </div>
+            <div class="article-work-card__body">
+              <h3>{{ work.title }}</h3>
+              <p>{{ work.description }}</p>
+              <span class="article-work-card__author">{{ work.creatorName }}</span>
+            </div>
+          </RouterLink>
+        </div>
       </section>
     </template>
   </div>
@@ -268,6 +291,69 @@ onMounted(fetchDetail)
   margin: 0 0 12px;
   font-size: 17px;
   color: var(--sp-text-strong);
+}
+
+.article-related__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.article-work-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sp-border);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.article-work-card:hover {
+  border-color: rgba(64, 158, 255, 0.5);
+  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.article-work-card__cover {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--sp-primary-soft);
+}
+
+.article-work-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.article-work-card__body {
+  padding: 12px 14px 14px;
+}
+
+.article-work-card__body h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--sp-text-strong);
+}
+
+.article-work-card__body p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--sp-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.article-work-card__author {
+  font-size: 11px;
+  color: var(--sp-text-faint);
 }
 
 @media (max-width: 720px) {

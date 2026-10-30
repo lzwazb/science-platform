@@ -69,6 +69,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/users/**").hasRole("SUPER_ADMIN")
                         // 其余后台接口需要管理员及以上
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        // 创作者中心：创作者、管理员、超级管理员
+                        .requestMatchers("/api/v1/creator/**").hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
+                        // 审核工作台：评审员、管理员、超级管理员
+                        .requestMatchers("/api/v1/review/**").hasAnyRole("REVIEWER", "ADMIN", "SUPER_ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

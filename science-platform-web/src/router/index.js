@@ -49,6 +49,30 @@ const routes = [
         meta: { title: '专题详情' },
       },
       {
+        path: 'works',
+        name: 'works',
+        component: () => import('@/views/work/WorkListView.vue'),
+        meta: { title: '创意作品' },
+      },
+      {
+        path: 'works/:id',
+        name: 'work-detail',
+        component: () => import('@/views/work/WorkDetailView.vue'),
+        meta: { title: '作品详情' },
+      },
+      {
+        path: 'creator/works',
+        name: 'creator-works',
+        component: () => import('@/views/creator/CreatorWorksView.vue'),
+        meta: { title: '创作者中心', requiresAuth: true, roles: ['CREATOR', 'ADMIN', 'SUPER_ADMIN'] },
+      },
+      {
+        path: 'review/works',
+        name: 'review-works',
+        component: () => import('@/views/review/ReviewWorksView.vue'),
+        meta: { title: '作品审核', requiresAuth: true, roles: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
+      },
+      {
         path: 'login',
         name: 'login',
         component: () => import('@/views/auth/LoginView.vue'),

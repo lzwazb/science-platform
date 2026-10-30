@@ -17,6 +17,7 @@ import com.science.platform.modules.knowledge.vo.ArticleListItemVO;
 import com.science.platform.modules.knowledge.vo.TopicBriefVO;
 import com.science.platform.modules.user.entity.SysUser;
 import com.science.platform.modules.user.mapper.SysUserMapper;
+import com.science.platform.modules.work.service.WorkQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -45,17 +46,20 @@ public class ArticleQueryService {
     private final ScienceTopicMapper topicMapper;
     private final TopicArticleMapper topicArticleMapper;
     private final SysUserMapper sysUserMapper;
+    private final WorkQueryService workQueryService;
 
     public ArticleQueryService(ScienceArticleMapper articleMapper,
                                ScienceCategoryMapper categoryMapper,
                                ScienceTopicMapper topicMapper,
                                TopicArticleMapper topicArticleMapper,
-                               SysUserMapper sysUserMapper) {
+                               SysUserMapper sysUserMapper,
+                               WorkQueryService workQueryService) {
         this.articleMapper = articleMapper;
         this.categoryMapper = categoryMapper;
         this.topicMapper = topicMapper;
         this.topicArticleMapper = topicArticleMapper;
         this.sysUserMapper = sysUserMapper;
+        this.workQueryService = workQueryService;
     }
 
     /**
@@ -136,6 +140,8 @@ public class ArticleQueryService {
         vo.setAuthorName(author == null ? null : author.getNickname());
         // 所属专题
         vo.setTopics(findTopicsOfArticle(article.getId()));
+        // 关联的已发布创意作品
+        vo.setWorks(workQueryService.findPublishedWorksOfArticle(article.getId()));
 
         return vo;
     }

@@ -382,10 +382,80 @@ GET /api/v1/topics/{id}   # 详情，含按 sort_order 排列的文章
 **编辑已发布文章不触发重新审核**：文章由管理员直接维护，与「作品编辑后需重新审核」的规则不同。
 **编辑文章不改 `version_no`**：版本号只在「知识贡献被采纳」的审核流程中递增（阶段 6），保证版本历史与审核记录一一对应。
 
+### 2.11 作品公开接口
+
+```
+GET /api/v1/works?page=1&size=12&categoryId=&keyword=
+GET /api/v1/works/{id}
+```
+
+无需认证。**只返回 `status = PUBLISHED` 的作品**——草稿、待审核、已驳回、已下架的作品在列表和详情中一律不可见。
+
+作品详情返回创作者昵称与简介、以及关联的科普文章列表（`articles`），体现「知识与作品关联」这一项目特色。
+
+**反向关联**：`GET /api/v1/articles/{id}` 的响应里有 `works` 字段，返回该文章关联的已发布作品。实测文章 7 返回「碳足迹的一天：从早餐到熄灯」。
+
+### 2.12 创作者中心
+
+需 `CREATOR`、`ADMIN` 或 `SUPER_ADMIN`。普通用户返回 403（实测）。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/creator/works` | 我的作品分页，含草稿与驳回；支持 `status` 筛选 |
+| GET | `/api/v1/creator/works/{id}` | 我的作品详情，允许草稿；**非本人返回 403** |
+| POST | `/api/v1/creator/works` | 创建作品，初始 `DRAFT` |
+| PUT | `/api/v1/creator/works/{id}` | 编辑作品 |
+| POST | `/api/v1/creator/works/{id}/submit` | 提交审核 |
+| DELETE | `/api/v1/creator/works/{id}` | 删除（逻辑删除） |
+| PUT | `/api/v1/creator/works/{id}/articles` | 更新关联文章，body `{"articleIds": [1, 2]}` |
+
+> **路径变更说明**：开发档案 8.3 把「创建作品」写在 `POST /api/v1/works`，这里改为 `/api/v1/creator/works`。
+> 原因是 `/api/v1/works/**` 在安全配置里是公开路径前缀，把写操作混进公开前缀会让授权规则难以表达；
+> 拆到 `/creator/**` 后可以给整块路径统一加角色限制，语义也更清楚。
+
+**状态流转**：
+
+```
+创建 → DRAFT ──submit──> PENDING ──approve──> PUBLISHED ──offline──> OFFLINE
+                            └──reject──> REJECTED ──submit──> PENDING
+PUBLISHED ──编辑──> PENDING（自动重新送审）
+```
+
+**业务规则实测**：
+
+| 场景 | 结果 |
+| --- | --- |
+| 用户 B 查看 / 修改 / 删除用户 A 的作品 | `403`（「只能操作自己的作品」「只能查看自己的作品」） |
+| 重复提交审核 | `400 作品已在审核中，请勿重复提交` |
+| 提交已发布作品 | `400 作品已发布，如需修改请编辑后重新提交审核` |
+| 驳回但不填意见 | `400 驳回时必须填写审核意见` |
+| 重新提交后 | `status=PENDING`，**旧审核意见与审核时间被清空** |
+| 编辑已发布作品 | 自动变 `PENDING`，从公开列表消失 |
+| 删除被活动投稿引用的作品 | `400 该作品已被 1 个活动投稿引用，不能删除` |
+| 关联未发布的文章 | `400 只能关联已发布的科普文章` |
+| 关联不存在的文章 | `400 部分关联文章不存在` |
+| 作品分类选了文章分类 | `400 所选分类不是作品分类` |
+
+### 2.13 作品审核
+
+需 `REVIEWER`、`ADMIN` 或 `SUPER_ADMIN`。创作者访问返回 403（实测）。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/review/works` | 作品列表，**默认 `status=PENDING`** |
+| GET | `/api/v1/review/works/{id}` | 审核详情，含作品全文与关联文章 |
+| POST | `/api/v1/review/works/{id}/approve` | 通过，body `{"comment": "..."}`（意见可空） |
+| POST | `/api/v1/review/works/{id}/reject` | 驳回，body `{"comment": "..."}`（意见必填） |
+| POST | `/api/v1/review/works/{id}/offline` | 下架已发布作品 |
+
+**并发防护**：三个动作都要求操作前状态为 `PENDING`（下架要求 `PUBLISHED`），
+否则返回 `400 该作品当前状态为已发布，不能进行审核`。这样可以防止两位评审员同时点「通过」造成状态错乱。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
-（阶段 3 已实现认证与个人资料 5 个接口，阶段 4 已实现知识库与后台内容维护 20 个接口，见 2.2–2.10。）
+（阶段 3 已实现认证与个人资料 5 个接口，阶段 4 实现知识库与后台内容维护 20 个接口，
+阶段 5 实现作品公开 / 创作者 / 审核 13 个接口，见 2.2–2.13。）
 
 | 模块 | 方法 | 路径 | 用途 | 计划阶段 |
 | --- | --- | --- | --- | --- |
@@ -396,12 +466,6 @@ GET /api/v1/topics/{id}   # 详情，含按 sort_order 排列的文章
 | 知识审核 | POST | `/reviews/contributions/{id}/reject` | 驳回贡献并填写意见 | 6 |
 | 版本 | GET | `/articles/{id}/versions` | 查看文章版本列表 | 6 |
 | 版本 | GET | `/articles/{id}/versions/{versionNo}` | 查看某历史版本 | 6 |
-| 作品 | GET | `/works` | 公开作品列表 | 5 |
-| 作品 | GET | `/works/{id}` | 作品详情 | 5 |
-| 作品 | POST | `/works` | 创作者创建作品 | 5 |
-| 作品 | PUT | `/works/{id}` | 编辑本人作品 | 5 |
-| 作品 | DELETE | `/works/{id}` | 删除/下架本人作品 | 5 |
-| 作品关联 | PUT | `/works/{id}/articles` | 更新作品关联文章 | 5 |
 | 互动 | POST | `/interactions/likes` | 点赞 | 7 |
 | 互动 | DELETE | `/interactions/likes` | 取消点赞 | 7 |
 | 互动 | POST | `/interactions/favorites` | 收藏 | 7 |
