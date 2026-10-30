@@ -64,7 +64,9 @@ const routes = [
         path: 'creator/works',
         name: 'creator-works',
         component: () => import('@/views/creator/CreatorWorksView.vue'),
-        meta: { title: '创作者中心', requiresAuth: true, roles: ['CREATOR', 'ADMIN', 'SUPER_ADMIN'] },
+        // 创作不设角色门槛：后端 /creator/** 只要求登录，路由守卫必须与之一致，
+        // 否则会出现「看得到入口、点进去被拦」的矛盾
+        meta: { title: '创作者中心', requiresAuth: true },
       },
       {
         path: 'events',

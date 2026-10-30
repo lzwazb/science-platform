@@ -32,6 +32,17 @@ public class InteractionComment {
     /** 父评论 ID，支持一层回复 */
     private Long parentId;
 
+    /**
+     * 实际被回复的那条评论 ID。
+     *
+     * <p>{@code parentId} 只用于「楼层归属」（都挂在根评论下，保持一层结构），
+     * 而 {@code replyToCommentId} 记录的是「这句话是在回谁」。</p>
+     *
+     * <p>两者分开存的原因：如果把 parentId 同时当作通知依据，
+     * A → B → C 这种对话里 C 的通知会发给 A 而不是 B，被回复的人完全收不到。</p>
+     */
+    private Long replyToCommentId;
+
     private String content;
 
     /** VISIBLE / HIDDEN / DELETED */

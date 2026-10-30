@@ -22,8 +22,10 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -59,6 +61,9 @@ class EventApiTest {
 
     @Autowired
     private EventReviewMapper reviewMapper;
+
+    @Autowired
+    private EventService eventService;
 
     private JsonNode readJson(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
@@ -514,5 +519,110 @@ class EventApiTest {
         mockMvc.perform(get("/api/v1/admin/events")
                         .header("Authorization", "Bearer " + token("user01")))
                 .andExpect(status().isForbidden());
+    }
+
+    // ---------- 状态白名单与删除保护 ----------
+
+    @Test
+    @DisplayName("非法状态在 HTTP 入口就被拦下（DTO 上的 @Pattern）")
+    void invalidStatusRejectedAtHttpLayer() throws Exception {
+        String adminToken = token("admin01");
+
+        // 创建时传非法状态
+        mockMvc.perform(post("/api/v1/admin/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "【测试】非法状态",
+                                "startAt", "2026-11-01 00:00:00",
+                                "endAt", "2026-12-01 00:00:00",
+                                "status", "ONGOING")))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("活动状态只能是")));
+
+        // 编辑时传小写状态同样被拒
+        mockMvc.perform(put("/api/v1/admin/events/" + ONGOING_EVENT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "星际漫游者 · 2026 秋季科普创作大赛",
+                                "startAt", "2026-10-01 00:00:00",
+                                "endAt", "2026-12-31 23:59:59",
+                                "status", "ended")))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Service 层也挡非法状态（绕过 DTO 直接调用时的第二道防线）")
+    void invalidStatusRejectedAtServiceLayer() {
+        var request = new com.science.platform.modules.event.dto.EventSaveRequest();
+        request.setTitle("绕过 DTO 的请求");
+        request.setStartAt(java.time.LocalDateTime.now().plusDays(1));
+        request.setEndAt(java.time.LocalDateTime.now().plusDays(10));
+        request.setStatus("ONGOING");
+
+        var ex = org.junit.jupiter.api.Assertions.assertThrows(
+                com.science.platform.common.exception.BusinessException.class,
+                () -> eventService.create(request, 1L));
+        assertTrue(ex.getMessage().contains("活动状态只能是"),
+                "Service 层应拒绝白名单外的状态，实际提示：" + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("未提供状态时默认存为草稿")
+    void statusDefaultsToDraft() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/v1/admin/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "【测试】不传状态",
+                                "startAt", "2026-11-01 00:00:00",
+                                "endAt", "2026-12-01 00:00:00")))
+                        .header("Authorization", "Bearer " + token("admin01")))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertEquals("DRAFT", readJson(created).path("data").path("status").asText());
+    }
+
+    @Test
+    @DisplayName("已有投稿的活动不能直接删除")
+    void cannotDeleteEventWithSubmissions() throws Exception {
+        // 活动 1 在演示数据里有 2 条投稿
+        mockMvc.perform(delete("/api/v1/admin/events/" + ONGOING_EVENT)
+                        .header("Authorization", "Bearer " + token("admin01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("已有 2 条投稿，不能直接删除")));
+
+        // 活动仍然存在
+        mockMvc.perform(get("/api/v1/events/" + ONGOING_EVENT))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("没有投稿的活动可以正常删除")
+    void canDeleteEventWithoutSubmissions() throws Exception {
+        String adminToken = token("admin01");
+
+        MvcResult created = mockMvc.perform(post("/api/v1/admin/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", "【测试】待删除活动",
+                                "startAt", "2026-11-01 00:00:00",
+                                "endAt", "2026-12-01 00:00:00",
+                                "status", "DRAFT")))
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        long eventId = readJson(created).path("data").path("id").asLong();
+
+        mockMvc.perform(delete("/api/v1/admin/events/" + eventId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/admin/events/" + eventId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
     }
 }

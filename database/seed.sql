@@ -359,13 +359,14 @@ INSERT INTO `event_review` (`id`, `submission_id`, `reviewer_id`, `score`, `comm
 -- 七、社区互动
 -- =============================================================================
 
-INSERT INTO `interaction_comment` (`id`, `user_id`, `target_type`, `target_id`, `parent_id`, `content`, `status`, `created_at`, `updated_at`) VALUES
-(1, 6, 'ARTICLE', 1, NULL, '“只转了约二十圈”这个说法挺直观的，之前一直没概念。', 'VISIBLE', '2026-02-16 09:12:00', '2026-02-16 09:12:00'),
-(2, 4, 'ARTICLE', 1, 1, '对，用公转圈数比单说年数更容易建立尺度感。', 'VISIBLE', '2026-02-16 11:40:00', '2026-02-16 11:40:00'),
-(3, 6, 'ARTICLE', 3, NULL, '想问一下，非编码区域不编码蛋白，那它们的作用主要是什么？', 'VISIBLE', '2026-03-06 20:05:00', '2026-03-06 20:05:00'),
-(4, 6, 'ARTICLE', 7, NULL, '280 ppm 到 420 ppm 这个对比很有说服力。', 'VISIBLE', '2026-07-11 08:30:00', '2026-07-11 08:30:00'),
-(5, 5, 'WORK', 3, NULL, '这个方块对比的量级处理得不错，一眼能看出通勤占大头。', 'VISIBLE', '2026-09-19 12:00:00', '2026-09-19 12:00:00'),
-(6, 6, 'ARTICLE', 5, NULL, '结尾提到 Let''s Encrypt，想问有没有对比过不同证书类型的差别？', 'HIDDEN', '2026-04-09 22:15:00', '2026-04-10 09:00:00');
+INSERT INTO `interaction_comment` (`id`, `user_id`, `target_type`, `target_id`, `parent_id`, `reply_to_comment_id`, `content`, `status`, `created_at`, `updated_at`) VALUES
+(1, 6, 'ARTICLE', 1, NULL, NULL, '“只转了约二十圈”这个说法挺直观的，之前一直没概念。', 'VISIBLE', '2026-02-16 09:12:00', '2026-02-16 09:12:00'),
+(2, 4, 'ARTICLE', 1, 1, 1, '对，用公转圈数比单说年数更容易建立尺度感。', 'VISIBLE', '2026-02-16 11:40:00', '2026-02-16 11:40:00'),
+(3, 6, 'ARTICLE', 3, NULL, NULL, '想问一下，非编码区域不编码蛋白，那它们的作用主要是什么？', 'VISIBLE', '2026-03-06 20:05:00', '2026-03-06 20:05:00'),
+(4, 6, 'ARTICLE', 7, NULL, NULL, '280 ppm 到 420 ppm 这个对比很有说服力。', 'VISIBLE', '2026-07-11 08:30:00', '2026-07-11 08:30:00'),
+(5, 5, 'WORK', 3, NULL, NULL, '这个方块对比的量级处理得不错，一眼能看出通勤占大头。', 'VISIBLE', '2026-09-19 12:00:00', '2026-09-19 12:00:00'),
+(6, 6, 'ARTICLE', 5, NULL, NULL, '结尾提到 Let''s Encrypt，想问有没有对比过不同证书类型的差别？', 'HIDDEN', '2026-04-09 22:15:00', '2026-04-10 09:00:00'),
+(7, 4, 'ARTICLE', 3, 3, 3, '非编码区里有大量调控序列，它们不编码蛋白但决定基因何时何地表达。', 'VISIBLE', '2026-03-07 09:30:00', '2026-03-07 09:30:00');
 
 INSERT INTO `interaction_like` (`id`, `user_id`, `target_type`, `target_id`, `created_at`) VALUES
 (1, 6, 'ARTICLE', 1, '2026-02-16 09:10:00'),

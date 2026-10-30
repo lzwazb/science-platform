@@ -2140,3 +2140,192 @@ records.forEach(node -> assertTrue(node.path("id").asLong() != PENDING_WORK_ID))
 ```
 
 测试完成后已用 `seed.sql` 重置演示数据。
+
+---
+
+## 2026-10-30 · 代码审查第一优先级修复
+
+**来源**：外部代码审查提出 16 条问题。逐条核实后确认**全部属实**（其中第 4 条部分不属实，见下），
+本轮先修第一优先级 6 条——它们直接影响数据正确性或功能可用性。
+
+### 1. 前端路由与后端权限不一致（第 6 条）
+
+`router/index.js` 的 `/creator/works` 还留着 `roles: ['CREATOR','ADMIN','SUPER_ADMIN']`，
+但上一轮已经把后端放宽为「登录即可」。
+
+结果：普通用户看得到「创作者中心」入口，点进去被路由守卫拦下弹「没有权限」。
+
+**这是上一轮的疏漏**——当时只验证了接口（PowerShell 直接打 API 全部通过），
+没走前端路由，所以没暴露。教训是：**接口通过不等于界面能用**。
+
+修复：meta 只留 `requiresAuth: true`。
+
+### 2. 评论回复通知发错人（第 1 条）
+
+原实现先把 `parentId` 提升成根评论 ID，又用提升后的 ID 去查「被回复的评论」发通知：
+
+```java
+if (parent.getParentId() != null) {
+    parentId = parent.getParentId();        // 提升成根评论
+}
+...
+InteractionComment parent = commentMapper.selectById(parentId);  // 拿到的是根评论
+notificationService.send(parent.getUserId(), ...);               // 发给根评论作者
+```
+
+**A 发评论 → B 回 A → C 回 B**：C 的通知发给 A，B 一条收不到，
+而且 A 收到的消息内容跟自己的评论毫无关系。
+
+修复方式（同时按需求补充功能）：
+
+| 改动 | 说明 |
+| --- | --- |
+| 新增列 `reply_to_comment_id` | 记录「实际在回谁」，与楼层归属 `parent_id` 分开 |
+| `CommentService.create` | 进提升逻辑前先留住 `replyTo`，通知发给 `replyTo.getUserId()` |
+| `CommentVO` 新增 `replyToCommentId` / `replyToUserName` | 前端渲染「回复 @某人」 |
+| `CommentSection.vue` | 回复列表显示「回复 @昵称」，并支持对同层回复再次回复 |
+| `seed.sql` | 追加一条演示用二层回复（评论 7），便于直接看到效果 |
+
+**为什么加列而不是只改通知逻辑**：楼层结构只保留一层，所以「回复的回复」都挂同一个根评论，
+只有 `parent_id` 的话无法知道「这句话在回谁」。加一列后通知收件人与界面展示同时变正确。
+
+### 3. 阅读量并发丢失（第 2 条）
+
+原来是「读出来 +1 再 `updateById` 写回」，两个请求同时进来会互相覆盖。
+
+**修的过程中发现报告只说对了一半**：换成自定义 SQL `view_count = view_count + 1` 之后，
+`updated_at` 依然被刷新——因为表定义里有 `ON UPDATE CURRENT_TIMESTAMP`，
+**任何 UPDATE 都会自动改它**，跟用不用 `updateById` 无关。
+
+真正的修法：
+
+```sql
+UPDATE science_article
+SET view_count = view_count + 1, updated_at = updated_at
+WHERE id = #{id} AND deleted = 0
+```
+
+显式 `SET updated_at = updated_at` 抑制自动更新。文章与作品各加一个 Mapper 方法。
+
+**实测**：阅读 3 次，`view_count` 943 → 946，`updated_at` 完全没变。
+
+### 4. 整行回写覆盖浏览量（第 3 条）
+
+`ArticleAdminService.update/publish/offline` 和 `WorkService.update` 都是
+「读出实体 → 改几个字段 → `updateById` 全量回写」，两个后果：
+
+- 把读到的旧 `view_count` 写回去，覆盖这期间的阅读量
+- MyBatis-Plus 默认 NOT_NULL 策略让「清空摘要 / 清空封面」变成无效操作
+
+全部改成 `LambdaUpdateWrapper` 逐列 `set`。
+
+讽刺的是 `WorkService` 里早有一段注释专门解释为什么不能这么写（`updateReviewFields` 用的就是 wrapper），
+但 `update()`、`publish()`、`offline()` 三个方法还留在 `updateById` 上——**知道坑在哪，只填了一半**。
+
+**实测**：把文章摘要置为 null 提交后，数据库里确实是 `NULL`（原来会保留旧值）。
+
+### 5. 活动状态白名单（第 4 条）
+
+**这条报告不完全属实**：`EventSaveRequest.status` 上早就有
+`@Pattern(regexp = "DRAFT|PUBLISHED|CLOSED|CANCELLED")`，HTTP 入口已经拦住了非法值
+（实测传 `ONGOING` 返回 400）。
+
+但仍然做了加固：Service 层加一道白名单校验（`VALID_STATUSES`），
+防止将来有定时任务、批处理等**绕过 DTO 直接调 Service** 的调用方把脏值写进库。
+两处白名单保持一致，不做大小写宽容（与 DTO 的严格校验对齐）。
+
+顺带把 `publish` / `close` 也从 `updateById` 改成只更新状态列。
+
+### 6. 活动删除不检查投稿（第 5 条）
+
+`WorkService.delete` 会检查「作品是否被活动投稿引用」，但 `EventService.delete`
+只查活动存在就直接删——**逻辑删除后 `event_submission` 仍然挂着**，
+前台会出现「我的投稿里有记录、点进活动却 404」。
+
+修复：`EventSubmissionMapper` 加 `countByEventId`，删除前检查，
+有投稿时拒绝并提示改用「结束活动」。
+
+**实测**：删除有 2 条投稿的活动 1 → `400 该活动已有 2 条投稿，不能直接删除；如需停止收集，请使用「结束活动」`。
+
+### 7. 测试与验证
+
+新增两个测试类：
+
+| 测试类 | 用例 | 覆盖 |
+| --- | --- | --- |
+| `CommentReplyNotificationTest` | 4 | 一层回复通知、三层对话通知收件人、`replyToUserName` 展示、自己回复自己不通知 |
+| `ViewCountTest` | 3 | 阅读量 +1 且 `updated_at` 不变、作品同理、连续多次阅读 |
+
+`EventApiTest` 补 3 条：非法状态被拒（HTTP 层与 Service 层各一条）、有投稿不能删除、无投稿可删除。
+
+```
+Tests run: 140, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+**过程中遇到的一个测试问题**（值得记下来）：
+
+`CommentReplyNotificationTest` 断言「A 只收到 1 条通知」，实际是 2 条，两条内容完全一样。
+排查后发现是**我手工验证时留下的历史通知没清**，测试把演示库当成了干净库。
+
+修法不是重置数据库了事，而是把断言改成增量：
+
+```java
+long toABefore = countReplyNotificationsTo(USER_A);
+... 执行三步对话 ...
+assertEquals(toABefore + 1, countReplyNotificationsTo(USER_A));
+```
+
+**这是第四次在「断言依赖绝对数量」上出问题**（前三次：硬编码点赞数、硬编码活动总数、硬编码已发布作品数）。
+规律已经非常清楚：**凡是有外部数据的环境，断言就该用增量或按 id 判断，而不是绝对条数**。
+
+### 8. 本阶段产出文件
+
+```
+后端新增：
+  event/mapper/EventSubmissionMapper.java（加 countByEventId）
+
+后端修改：
+  knowledge/mapper/ScienceArticleMapper.java（increaseViewCount，含 updated_at 保持）
+  work/mapper/CreatorWorkMapper.java（increaseViewCount）
+  knowledge/service/ArticleQueryService.java（改用原子自增）
+  work/service/WorkQueryService.java（同）
+  knowledge/service/ArticleAdminService.java（update/publish/offline 改 wrapper）
+  work/service/WorkService.java（update 改 wrapper）
+  event/service/EventService.java（状态白名单、删除前检查投稿、publish/close 改 wrapper）
+  interaction/service/CommentService.java（通知收件人修正 + replyTo 组装）
+  interaction/entity/InteractionComment.java（加 replyToCommentId）
+  interaction/vo/CommentVO.java（加 replyToCommentId / replyToUserName）
+
+数据库：
+  schema.sql（interaction_comment 加 reply_to_comment_id + 外键 + 索引）
+  seed.sql（评论 7 演示二层回复，其余回复补 reply_to_comment_id）
+
+前端：
+  router/index.js（/creator/works 去掉 roles）
+  components/CommentSection.vue（显示「回复 @某人」，支持对同层回复）
+
+测试：
+  interaction/CommentReplyNotificationTest.java（新增 4 用例）
+  knowledge/ViewCountTest.java（新增 3 用例）
+  event/EventApiTest.java（补 3 用例）
+
+文档：
+  docs/数据库设计/数据字典.md（新列与设计理由）
+  docs/development-log.md（本节）
+```
+
+### 9. 剩余问题（审查文档的第二、三优先级，本轮未处理）
+
+| # | 问题 | 优先级 |
+| --- | --- | --- |
+| 7 | 测试依赖本机 MySQL，换机器跑不了 | 中 |
+| 8 | 75 个接口靠手写文档维护 | 低 |
+| 9 | 授权规则依赖路径顺序 | 中 |
+| 10 | JWT 过滤器每请求两次查库 | 低 |
+| 11 | 登录无失败次数限制 | 中 |
+| 12 | 逻辑删除 + `uk_username` 冲突 | 中 |
+| 13 | 401 有两条跳转路径 | 中 |
+| 14 | 状态中文映射重复（后端 5 处 + 前端 11 文件） | 低 |
+| 15 | 前端无 lint / 单测 | 低 |
+| 16 | README 三处账对不上 | 低（顺手可改） |

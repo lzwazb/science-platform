@@ -1,6 +1,7 @@
 package com.science.platform.modules.knowledge.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.science.platform.common.exception.BusinessException;
@@ -22,8 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
-import java.util.Collections;
+import java.time.LocalDateTime;import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -167,13 +167,20 @@ public class ArticleAdminService {
         }
         validateCategory(request.getCategoryId());
 
-        article.setTitle(request.getTitle().trim());
-        article.setSummary(request.getSummary());
-        article.setContent(request.getContent());
-        article.setCoverUrl(request.getCoverUrl());
-        article.setCategoryId(request.getCategoryId());
+        // 逐列 set，不用 updateById(entity)：
+        // 1) 整行回写会把读出来的旧 view_count 一起写回去，覆盖这期间的阅读量；
+        // 2) MyBatis-Plus 默认 NOT_NULL 策略，传 null 的字段不会出现在 SET 里，
+        //    导致「清空摘要 / 清空封面」变成无效操作。逐列 set 两个问题都解决。
+        LambdaUpdateWrapper<ScienceArticle> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(ScienceArticle::getId, id)
+                .set(ScienceArticle::getTitle, request.getTitle().trim())
+                .set(ScienceArticle::getSummary, request.getSummary())
+                .set(ScienceArticle::getContent, request.getContent())
+                .set(ScienceArticle::getCoverUrl, request.getCoverUrl())
+                .set(ScienceArticle::getCategoryId, request.getCategoryId())
+                .set(ScienceArticle::getUpdatedAt, LocalDateTime.now());
+        articleMapper.update(null, wrapper);
 
-        articleMapper.updateById(article);
         return getDetailForAdmin(id);
     }
 
@@ -193,11 +200,15 @@ public class ArticleAdminService {
             throw new BusinessException("正文为空，无法发布");
         }
 
-        article.setStatus(STATUS_PUBLISHED);
+        // 只改状态与发布时间，不整行回写（避免把旧 view_count 写回去）
+        LambdaUpdateWrapper<ScienceArticle> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(ScienceArticle::getId, id)
+                .set(ScienceArticle::getStatus, STATUS_PUBLISHED)
+                .set(ScienceArticle::getUpdatedAt, LocalDateTime.now());
         if (article.getPublishedAt() == null) {
-            article.setPublishedAt(LocalDateTime.now());
+            wrapper.set(ScienceArticle::getPublishedAt, LocalDateTime.now());
         }
-        articleMapper.updateById(article);
+        articleMapper.update(null, wrapper);
         return getDetailForAdmin(id);
     }
 
@@ -214,8 +225,11 @@ public class ArticleAdminService {
             throw new BusinessException("文章已是下架状态");
         }
 
-        article.setStatus(STATUS_OFFLINE);
-        articleMapper.updateById(article);
+        LambdaUpdateWrapper<ScienceArticle> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(ScienceArticle::getId, id)
+                .set(ScienceArticle::getStatus, STATUS_OFFLINE)
+                .set(ScienceArticle::getUpdatedAt, LocalDateTime.now());
+        articleMapper.update(null, wrapper);
         return getDetailForAdmin(id);
     }
 

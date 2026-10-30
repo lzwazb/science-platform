@@ -95,18 +95,20 @@ public class CommentService {
         targetResolver.requirePublicTarget(request.getTargetType(), request.getTargetId());
 
         Long parentId = request.getParentId();
+        // replyTo 记录「实际在回谁」，parentId 记录「归属哪个楼层」，两者必须分开
+        InteractionComment replyTo = null;
         if (parentId != null) {
-            InteractionComment parent = commentMapper.selectById(parentId);
-            if (parent == null || !STATUS_VISIBLE.equals(parent.getStatus())) {
+            replyTo = commentMapper.selectById(parentId);
+            if (replyTo == null || !STATUS_VISIBLE.equals(replyTo.getStatus())) {
                 throw BusinessException.notFound("要回复的评论不存在");
             }
-            if (!Objects.equals(parent.getTargetType(), request.getTargetType())
-                    || !Objects.equals(parent.getTargetId(), request.getTargetId())) {
+            if (!Objects.equals(replyTo.getTargetType(), request.getTargetType())
+                    || !Objects.equals(replyTo.getTargetId(), request.getTargetId())) {
                 throw new BusinessException("回复的评论不属于当前内容");
             }
-            // 只保留一层：回复的回复挂到同一个根评论下
-            if (parent.getParentId() != null) {
-                parentId = parent.getParentId();
+            // 只保留一层：回复的回复挂到同一个根评论下，但 replyTo 仍是直接对象
+            if (replyTo.getParentId() != null) {
+                parentId = replyTo.getParentId();
             }
         }
 
@@ -115,28 +117,28 @@ public class CommentService {
         comment.setTargetType(request.getTargetType());
         comment.setTargetId(request.getTargetId());
         comment.setParentId(parentId);
+        comment.setReplyToCommentId(replyTo == null ? null : replyTo.getId());
         comment.setContent(request.getContent().trim());
         comment.setStatus(STATUS_VISIBLE);
         commentMapper.insert(comment);
 
-        // 回复他人时通知被回复者；自己回复自己不通知
-        if (parentId != null) {
-            InteractionComment parent = commentMapper.selectById(parentId);
-            if (parent != null && !Objects.equals(parent.getUserId(), userId)) {
-                SysUser replier = sysUserMapper.selectById(userId);
-                String replierName = replier == null ? "有人" : replier.getNickname();
-                String preview = comment.getContent();
-                if (preview.length() > 40) {
-                    preview = preview.substring(0, 40) + "…";
-                }
-                notificationService.send(
-                        parent.getUserId(),
-                        "COMMENT_REPLY",
-                        "你的评论收到回复",
-                        replierName + " 回复了你的评论：" + preview,
-                        request.getTargetType(),
-                        request.getTargetId());
+        // 通知发给「实际被回复的那条评论」的作者。
+        // 注意不能用 parentId 去查——它已经被提升成根评论了，
+        // 那样 A → B → C 的对话里通知会发错给 A，B 反而收不到。
+        if (replyTo != null && !Objects.equals(replyTo.getUserId(), userId)) {
+            SysUser replier = sysUserMapper.selectById(userId);
+            String replierName = replier == null ? "有人" : replier.getNickname();
+            String preview = comment.getContent();
+            if (preview.length() > 40) {
+                preview = preview.substring(0, 40) + "…";
             }
+            notificationService.send(
+                    replyTo.getUserId(),
+                    "COMMENT_REPLY",
+                    "你的评论收到回复",
+                    replierName + " 回复了你的评论：" + preview,
+                    request.getTargetType(),
+                    request.getTargetId());
         }
 
         return toVOs(List.of(comment), userId).get(0);
@@ -181,11 +183,24 @@ public class CommentService {
                 : sysUserMapper.selectBatchIds(userIds).stream()
                         .collect(Collectors.toMap(SysUser::getId, u -> u));
 
+        // 一次性把「被回复评论」的作者查出来，避免逐条查询
+        Map<Long, InteractionComment> replyToComments = loadReplyTargets(comments);
+        Set<Long> replyToUserIds = replyToComments.values().stream()
+                .map(InteractionComment::getUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        replyToUserIds.removeAll(users.keySet());
+        if (!replyToUserIds.isEmpty()) {
+            sysUserMapper.selectBatchIds(replyToUserIds)
+                    .forEach(u -> users.put(u.getId(), u));
+        }
+
         return comments.stream().map(comment -> {
             CommentVO vo = new CommentVO();
             vo.setId(comment.getId());
             vo.setUserId(comment.getUserId());
             vo.setParentId(comment.getParentId());
+            vo.setReplyToCommentId(comment.getReplyToCommentId());
             vo.setContent(comment.getContent());
             vo.setStatus(comment.getStatus());
             vo.setCreatedAt(comment.getCreatedAt());
@@ -195,7 +210,32 @@ public class CommentService {
                 vo.setUserName(user.getNickname());
                 vo.setUserAvatar(user.getAvatar());
             }
+            // 前端用它渲染「回复 @某人」
+            InteractionComment replyTo = comment.getReplyToCommentId() == null
+                    ? null
+                    : replyToComments.get(comment.getReplyToCommentId());
+            if (replyTo != null) {
+                SysUser replyToUser = users.get(replyTo.getUserId());
+                if (replyToUser != null) {
+                    vo.setReplyToUserName(replyToUser.getNickname());
+                }
+            }
             return vo;
         }).toList();
+    }
+
+    /**
+     * 批量加载被回复的评论，供展示「回复 @某人」使用。
+     */
+    private Map<Long, InteractionComment> loadReplyTargets(List<InteractionComment> comments) {
+        Set<Long> ids = comments.stream()
+                .map(InteractionComment::getReplyToCommentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return commentMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(InteractionComment::getId, c -> c));
     }
 }

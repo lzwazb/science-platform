@@ -212,18 +212,46 @@ onMounted(() => fetchComments(true))
 
           <div v-if="comment.replies?.length" class="comment-replies">
             <div v-for="reply in comment.replies" :key="reply.id" class="comment-reply">
-              <strong>{{ reply.userName }}</strong>
-              <span class="comment-reply__time">{{ reply.createdAt }}</span>
+              <div class="comment-reply__head">
+                <strong>{{ reply.userName }}</strong>
+                <!-- 回复同层其他读者时标出对象，否则楼层结构在界面上是塌的 -->
+                <span v-if="reply.replyToUserName && reply.replyToUserName !== comment.userName" class="comment-reply__target">
+                  回复 <em>@{{ reply.replyToUserName }}</em>
+                </span>
+                <span class="comment-reply__time">{{ reply.createdAt }}</span>
+              </div>
               <p>{{ reply.content }}</p>
-              <el-button
-                v-if="reply.mine || userStore.isAdmin"
-                link
-                type="danger"
-                size="small"
-                @click="handleDelete(reply)"
-              >
-                删除
-              </el-button>
+              <div class="comment-reply__actions">
+                <el-button link type="primary" size="small" @click="startReply(reply)">
+                  {{ replyTo?.id === reply.id ? '取消回复' : '回复' }}
+                </el-button>
+                <el-button
+                  v-if="reply.mine || userStore.isAdmin"
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleDelete(reply)"
+                >
+                  删除
+                </el-button>
+              </div>
+
+              <div v-if="replyTo?.id === reply.id" class="comment-reply-editor">
+                <el-input
+                  v-model="replyContent"
+                  type="textarea"
+                  :rows="2"
+                  maxlength="1000"
+                  show-word-limit
+                  :placeholder="`回复 @${reply.userName}`"
+                />
+                <div class="comment-reply-editor__footer">
+                  <el-button size="small" @click="replyTo = null">取消</el-button>
+                  <el-button size="small" type="primary" :loading="submitting" @click="handleReply">
+                    发布回复
+                  </el-button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -337,9 +365,32 @@ onMounted(() => fetchComments(true))
   gap: 12px;
 }
 
+.comment-reply__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .comment-reply strong {
   font-size: 12px;
   color: var(--sp-text-strong);
+}
+
+.comment-reply__target {
+  font-size: 11px;
+  color: var(--sp-text-faint);
+}
+
+.comment-reply__target em {
+  font-style: normal;
+  color: var(--sp-primary-dark);
+}
+
+.comment-reply__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .comment-reply__time {

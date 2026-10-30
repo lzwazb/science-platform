@@ -23,6 +23,12 @@ public class CommentVO {
 
     private Long parentId;
 
+    /** 实际被回复的评论 ID；顶层评论为 null */
+    private Long replyToCommentId;
+
+    /** 被回复者的昵称，前端用它渲染「回复 @某人」 */
+    private String replyToUserName;
+
     private String content;
 
     /** VISIBLE / HIDDEN / DELETED */

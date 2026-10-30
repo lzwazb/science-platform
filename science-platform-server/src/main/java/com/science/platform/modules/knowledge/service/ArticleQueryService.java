@@ -108,12 +108,11 @@ public class ArticleQueryService {
             throw BusinessException.notFound("文章不存在或未发布");
         }
 
-        // 增加阅读量：只更新这一列，避免把整个正文重新写一遍
-        ScienceArticle viewUpdate = new ScienceArticle();
-        viewUpdate.setId(article.getId());
-        viewUpdate.setViewCount(article.getViewCount() == null ? 1 : article.getViewCount() + 1);
-        articleMapper.updateById(viewUpdate);
-        article.setViewCount(viewUpdate.getViewCount());
+        // 增加阅读量：交给数据库做原子自增。
+        // 不用「读出来 +1 再写回」——并发下会丢计数，
+        // 而且 updateById 会连带刷新 updated_at，把「最后更新时间」变成「最后被点开的时间」。
+        articleMapper.increaseViewCount(article.getId());
+        article.setViewCount((article.getViewCount() == null ? 0 : article.getViewCount()) + 1);
 
         ArticleDetailVO vo = new ArticleDetailVO();
         vo.setId(article.getId());

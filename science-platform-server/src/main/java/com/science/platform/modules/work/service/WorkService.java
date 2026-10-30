@@ -97,12 +97,18 @@ public class WorkService {
         validateCategory(request.getCategoryId());
         validateArticles(request.getArticleIds());
 
-        work.setTitle(request.getTitle().trim());
-        work.setDescription(request.getDescription());
-        work.setContent(request.getContent());
-        work.setCoverUrl(request.getCoverUrl());
-        work.setCategoryId(request.getCategoryId());
-        workMapper.updateById(work);
+        // 逐列 set，不用 updateById(entity)：
+        // 整行回写会把读出来的旧 view_count 一起写回去（覆盖这期间的浏览量），
+        // 且 NOT_NULL 策略会让「清空描述 / 清空封面」变成无效操作。
+        LambdaUpdateWrapper<CreatorWork> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(CreatorWork::getId, id)
+                .set(CreatorWork::getTitle, request.getTitle().trim())
+                .set(CreatorWork::getDescription, request.getDescription())
+                .set(CreatorWork::getContent, request.getContent())
+                .set(CreatorWork::getCoverUrl, request.getCoverUrl())
+                .set(CreatorWork::getCategoryId, request.getCategoryId())
+                .set(CreatorWork::getUpdatedAt, LocalDateTime.now());
+        workMapper.update(null, wrapper);
 
         boolean needsReReview = STATUS_PUBLISHED.equals(work.getStatus());
         if (needsReReview) {

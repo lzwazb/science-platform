@@ -1,10 +1,12 @@
 package com.science.platform.modules.event.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.science.platform.common.exception.BusinessException;
 import com.science.platform.modules.event.dto.EventSaveRequest;
 import com.science.platform.modules.event.entity.CreativeEvent;
 import com.science.platform.modules.event.mapper.CreativeEventMapper;
+import com.science.platform.modules.event.mapper.EventSubmissionMapper;
 import com.science.platform.modules.event.vo.EventDetailVO;
 import com.science.platform.modules.event.vo.EventListItemVO;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 活动本体：创建、编辑、发布、结束，以及公开列表与详情。
@@ -30,15 +33,21 @@ public class EventService {
     public static final String STATUS_CLOSED = "CLOSED";
     public static final String STATUS_CANCELLED = "CANCELLED";
 
+    /** 合法状态白名单，用于校验保存请求 */
+    private static final Set<String> VALID_STATUSES =
+            Set.of(STATUS_DRAFT, STATUS_PUBLISHED, STATUS_CLOSED, STATUS_CANCELLED);
+
     public static final String TIME_NOT_STARTED = "NOT_STARTED";
     public static final String TIME_ONGOING = "ONGOING";
     public static final String TIME_ENDED = "ENDED";
     public static final String TIME_UNPUBLISHED = "UNPUBLISHED";
 
     private final CreativeEventMapper eventMapper;
+    private final EventSubmissionMapper submissionMapper;
 
-    public EventService(CreativeEventMapper eventMapper) {
+    public EventService(CreativeEventMapper eventMapper, EventSubmissionMapper submissionMapper) {
         this.eventMapper = eventMapper;
+        this.submissionMapper = submissionMapper;
     }
 
     /**
@@ -127,7 +136,7 @@ public class EventService {
         event.setCoverUrl(request.getCoverUrl());
         event.setStartAt(request.getStartAt());
         event.setEndAt(request.getEndAt());
-        event.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : STATUS_DRAFT);
+        event.setStatus(normalizeStatus(request.getStatus(), STATUS_DRAFT));
         event.setCreatorId(creatorId);
         eventMapper.insert(event);
         return event;
@@ -138,17 +147,44 @@ public class EventService {
         CreativeEvent event = requireEvent(id);
         validateTimeRange(request);
 
-        event.setTitle(request.getTitle().trim());
-        event.setDescription(request.getDescription());
-        event.setRules(request.getRules());
-        event.setCoverUrl(request.getCoverUrl());
-        event.setStartAt(request.getStartAt());
-        event.setEndAt(request.getEndAt());
+        // 逐列 set：整行回写会把读到的旧字段一起写回去，
+        // 也可能把别人同时改的状态覆盖掉
+        LambdaUpdateWrapper<CreativeEvent> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(CreativeEvent::getId, id)
+                .set(CreativeEvent::getTitle, request.getTitle().trim())
+                .set(CreativeEvent::getDescription, request.getDescription())
+                .set(CreativeEvent::getRules, request.getRules())
+                .set(CreativeEvent::getCoverUrl, request.getCoverUrl())
+                .set(CreativeEvent::getStartAt, request.getStartAt())
+                .set(CreativeEvent::getEndAt, request.getEndAt())
+                .set(CreativeEvent::getUpdatedAt, LocalDateTime.now());
         if (StringUtils.hasText(request.getStatus())) {
-            event.setStatus(request.getStatus());
+            wrapper.set(CreativeEvent::getStatus, normalizeStatus(request.getStatus(), event.getStatus()));
         }
-        eventMapper.updateById(event);
-        return event;
+        eventMapper.update(null, wrapper);
+        return eventMapper.selectById(id);
+    }
+
+    /**
+     * 校验活动状态。
+     *
+     * <p>DTO 上的 {@code @Pattern} 已经在 HTTP 入口拦了一道，这里是 Service 层的第二道防线：
+     * 将来若有别的调用方（定时任务、批处理、其他 Service）直接调用本方法，
+     * 脏状态依然进不了库。两处白名单必须保持一致。</p>
+     *
+     * @param status        请求里的状态
+     * @param fallbackValue 未提供时使用的值
+     * @throws BusinessException 状态不在白名单内
+     */
+    private String normalizeStatus(String status, String fallbackValue) {
+        if (!StringUtils.hasText(status)) {
+            return fallbackValue;
+        }
+        String trimmed = status.trim();
+        if (!VALID_STATUSES.contains(trimmed)) {
+            throw new BusinessException("活动状态只能是 DRAFT、PUBLISHED、CLOSED 或 CANCELLED");
+        }
+        return trimmed;
     }
 
     /**
@@ -163,9 +199,8 @@ public class EventService {
         if (STATUS_CLOSED.equals(event.getStatus())) {
             throw new BusinessException("已结束的活动不能重新发布");
         }
-        event.setStatus(STATUS_PUBLISHED);
-        eventMapper.updateById(event);
-        return event;
+        updateStatus(id, STATUS_PUBLISHED);
+        return eventMapper.selectById(id);
     }
 
     /**
@@ -177,14 +212,37 @@ public class EventService {
         if (STATUS_CLOSED.equals(event.getStatus())) {
             throw new BusinessException("活动已结束");
         }
-        event.setStatus(STATUS_CLOSED);
-        eventMapper.updateById(event);
-        return event;
+        updateStatus(id, STATUS_CLOSED);
+        return eventMapper.selectById(id);
     }
 
+    /**
+     * 只更新状态列，不整行回写。
+     */
+    private void updateStatus(Long id, String status) {
+        LambdaUpdateWrapper<CreativeEvent> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(CreativeEvent::getId, id)
+                .set(CreativeEvent::getStatus, status)
+                .set(CreativeEvent::getUpdatedAt, LocalDateTime.now());
+        eventMapper.update(null, wrapper);
+    }
+
+    /**
+     * 删除活动。
+     *
+     * <p>已有投稿的活动不允许直接删除：逻辑删除后 {@code event_submission} 仍然挂着，
+     * 前台会出现「我的投稿里有记录、点进活动却 404」。</p>
+     *
+     * <p>这与作品的删除规则保持一致——作品被投稿引用时同样禁止删除。</p>
+     */
     @Transactional
     public void delete(Long id) {
         CreativeEvent event = requireEvent(id);
+        long submissions = submissionMapper.countByEventId(id);
+        if (submissions > 0) {
+            throw new BusinessException("该活动已有 " + submissions + " 条投稿，不能直接删除；"
+                    + "如需停止收集，请使用「结束活动」");
+        }
         eventMapper.deleteById(event.getId());
     }
 

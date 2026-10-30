@@ -97,12 +97,8 @@ public class WorkQueryService {
             throw BusinessException.notFound("作品不存在或未发布");
         }
 
-        CreatorWork viewUpdate = new CreatorWork();
-        viewUpdate.setId(work.getId());
-        viewUpdate.setViewCount(work.getViewCount() == null ? 1 : work.getViewCount() + 1);
-        workMapper.updateById(viewUpdate);
-        work.setViewCount(viewUpdate.getViewCount());
-
+        workMapper.increaseViewCount(work.getId());
+        work.setViewCount((work.getViewCount() == null ? 0 : work.getViewCount()) + 1);
         return toDetail(work);
     }
 

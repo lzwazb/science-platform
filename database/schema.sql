@@ -274,7 +274,8 @@ CREATE TABLE `interaction_comment` (
     `user_id`     BIGINT UNSIGNED NOT NULL COMMENT '评论人 ID',
     `target_type` VARCHAR(20)     NOT NULL COMMENT '目标类型：ARTICLE/WORK',
     `target_id`   BIGINT UNSIGNED NOT NULL COMMENT '目标 ID',
-    `parent_id`   BIGINT UNSIGNED          DEFAULT NULL COMMENT '父评论 ID（支持回复）',
+    `parent_id`   BIGINT UNSIGNED          DEFAULT NULL COMMENT '楼层所属的根评论 ID（支持回复，只保留一层）',
+    `reply_to_comment_id` BIGINT UNSIGNED  DEFAULT NULL COMMENT '实际被回复的评论 ID（可能是根评论，也可能是同层回复）',
     `content`     VARCHAR(1000)   NOT NULL COMMENT '评论内容',
     `status`      VARCHAR(20)     NOT NULL DEFAULT 'VISIBLE' COMMENT '状态：VISIBLE/HIDDEN/DELETED',
     `created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -283,7 +284,9 @@ CREATE TABLE `interaction_comment` (
     KEY `idx_target` (`target_type`, `target_id`, `status`),
     KEY `idx_user_id` (`user_id`),
     KEY `idx_parent_id` (`parent_id`),
-    CONSTRAINT `fk_comment_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`)
+    KEY `idx_reply_to` (`reply_to_comment_id`),
+    CONSTRAINT `fk_comment_user` FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`id`),
+    CONSTRAINT `fk_comment_reply_to` FOREIGN KEY (`reply_to_comment_id`) REFERENCES `interaction_comment` (`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '评论';
 
 -- 点赞（同一用户对同一目标只能有一条记录）

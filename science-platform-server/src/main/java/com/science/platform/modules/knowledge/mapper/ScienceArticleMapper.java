@@ -5,6 +5,7 @@ import com.science.platform.modules.knowledge.entity.ScienceArticle;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * 科普文章 Mapper。
@@ -28,4 +29,23 @@ public interface ScienceArticleMapper extends BaseMapper<ScienceArticle> {
      */
     @Select("SELECT * FROM science_article WHERE id = #{id} AND deleted = 0 FOR UPDATE")
     ScienceArticle selectByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * 阅读量原子自增。
+     *
+     * <p><b>为什么不更新 updated_at：</b>表定义里 {@code updated_at} 带
+     * {@code ON UPDATE CURRENT_TIMESTAMP}，任何 UPDATE 都会把它刷新成当前时间——
+     * 也就是说光避开 {@code updateById} 还不够，数据库自己会改。
+     * 这里显式 {@code SET updated_at = updated_at}，MySQL 见到显式赋值就不会自动更新，
+     * 于是「最后更新时间」保持语义正确，不会被「最后一次被点开」污染。</p>
+     *
+     * <p>自增交给数据库做 {@code view_count + 1}，并发下不会丢计数。</p>
+     *
+     * @param id 文章 ID
+     * @return 受影响行数
+     */
+    @Update("UPDATE science_article "
+            + "SET view_count = view_count + 1, updated_at = updated_at "
+            + "WHERE id = #{id} AND deleted = 0")
+    int increaseViewCount(@Param("id") Long id);
 }
