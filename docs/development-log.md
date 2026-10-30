@@ -345,3 +345,185 @@ event_review 2 | sys_notification 7 | sys_operation_log 6
 3. 搭建角色授权：`@PreAuthorize` 或拦截器 + 方法级校验，保证普通用户调用管理接口返回 403
 4. 前端实现登录页、注册页、Pinia 用户 store、路由守卫与令牌携带（`request.js` 已预留）
 5. 补权限测试：T01 正常登录、T02 错误密码、T03 越权管理
+
+---
+
+## 2026-10-30 · 阶段 3：登录和角色权限
+
+**目标**（开发档案第 11 章）：实现注册、登录、密码哈希、认证、角色授权与演示账号，达成「不同角色能登录且越权请求被拒绝」。
+
+### 1. 依赖与配置
+
+| 变更 | 说明 |
+| --- | --- |
+| `spring-boot-starter-security` | 认证授权基础，同时提供 `BCryptPasswordEncoder` |
+| `jjwt-api / impl / jackson 0.12.7` | JWT 签发与校验；impl 与 jackson 仅运行期需要 |
+| `spring-security-test` | 测试用 |
+| `lombok` | 见下文说明 |
+| `spring-security-crypto` | 由 starter 传递引入 |
+
+**为什么此时引入 Lombok**：本阶段新增 7 个实体/DTO/VO，加上后续还有十余张表的实体，手写访问器会让业务代码被样板淹没。选择 Lombok 后把阶段 2 的 `ScienceArticle` 也改为 `@Data` 保持一致。已在 pom 注释中说明理由，答辩时可解释为「编译期生成字节码，不影响运行时」。
+
+**JWT 密钥管理**：`application.yml` 中写 `${APP_JWT_SECRET:}`，本地密钥放在 `application-local.yml`（gitignore），示例文件给出生成命令。密钥长度不足 32 字节时 `JwtTokenProvider` 在 `@PostConstruct` 阶段直接抛异常，应用拒绝启动，避免弱密钥上线。
+
+### 2. 后端实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `security/JwtProperties.java` | 绑定 `app.jwt` |
+| `security/JwtTokenProvider.java` | HS512 签发与解析，密钥长度自检 |
+| `security/LoginUser.java` | 放入 SecurityContext 的主体（id / username / nickname / roles） |
+| `security/JwtAuthenticationFilter.java` | 解析 Bearer 令牌，**每次请求查库校验用户状态与角色** |
+| `security/SecurityConfig.java` | 过滤器链、无状态会话、授权规则、401/403 处理器 |
+| `security/RestAuthenticationEntryPoint.java` | 401 统一 JSON |
+| `security/RestAccessDeniedHandler.java` | 403 统一 JSON |
+| `security/SecurityUtils.java` | 从上下文取当前用户，未登录抛 401 |
+| `config/CorsConfig.java` | 改为提供 `CorsConfigurationSource` Bean，供 Security 复用（否则预检请求被拦成 401） |
+| `config/JacksonConfig.java` | 统一 `LocalDateTime` 格式 |
+| `modules/auth/**` | 注册、登录、`/auth/me` |
+| `modules/user/**` | 用户实体、Mapper、资料读写 |
+
+**授权规则顺序**（关键）：
+
+```java
+.requestMatchers("/api/v1/admin/users/**").hasRole("SUPER_ADMIN")   // 必须在前
+.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+```
+
+顺序写反会导致普通管理员也能进超管接口。
+
+### 3. 两个自查修复
+
+| 问题 | 现象 | 处理 |
+| --- | --- | --- |
+| 时间格式不一致 | 登录响应里 `timestamp` 是 `2026-10-30 13:28:43`，而 `user.createdAt` 是 `2026-01-05T09:05:00` | 根因是 `spring.jackson.date-format` 只作用于 `java.util.Date`。新增 `JacksonConfig` 注册 `LocalDateTime` 的序列化器，实测两者统一 |
+| store 直接访问 localStorage | SSR 渲染检查时报 `ReferenceError: localStorage is not defined` | 改为 `typeof localStorage === 'undefined'` 判断后读取。浏览器不受影响，同时让 store 可在无 DOM 环境初始化 |
+
+> 备注：SSR 渲染检查用的临时脚本遇到 Element Plus 的 `IdInjection` 警告，需要在脚本里 `app.provide(ID_INJECTION_KEY, ...)`。这属于检查工具的环境问题，**不是应用缺陷**（浏览器端不需要）。脚本为一次性文件，验证后已删除。
+
+### 4. 验证（真实运行）
+
+#### 4.1 接口级验证（PowerShell + curl 实测）
+
+| 场景 | 期望 | 实测 |
+| --- | --- | --- |
+| 正常登录 `admin01/123456` | 200 + 令牌 + roles=[ADMIN] | ✅ `expiresIn=7200`，`expiresIn` 与配置一致 |
+| 错误密码 | 401 | ✅ `用户名或密码错误` |
+| 不存在的账号 | 401，提示与上一条相同 | ✅ 两条 message 完全一致 |
+| 无令牌访问 `/users/me` | 401 + 统一 JSON | ✅ `{"code":401,"message":"请先登录后再进行该操作",...}` |
+| 伪造令牌 | 401 | ✅ |
+| 篡改签名（保留 payload） | 401 | ✅ |
+| 有效令牌访问 `/users/me` | 200 | ✅ 返回 user01 资料 |
+| 普通用户访问 `/admin/users` | 403 | ✅ `{"code":403,"message":"没有权限执行该操作",...}` |
+| 管理员访问 `/admin/users` | 403（仅超管） | ✅ |
+| 注册新用户 | 200 + 自动赋 USER 角色 | ✅ 实测 `roles=["USER"]` |
+| 重复用户名注册 | 400 | ✅ `用户名已被占用` |
+| 多字段校验失败 | 400 + 中文拼接 | ✅ `nickname 昵称不能为空；username 用户名长度需在 3 到 20 个字符之间；password 密码长度需在 6 到 32 个字符之间` |
+| `PUT /users/me` 更新昵称与简介 | 200 + 返回最新资料 | ✅ |
+| `PUT /users/me` 非法邮箱 | 400 | ✅ `email 邮箱格式不正确` |
+| **禁用账号后登录** | 403 | ✅ `账号已被禁用，请联系管理员` |
+| **禁用账号用未过期旧令牌访问** | 401 | ✅ 证明「每请求查库」的设计生效，权限变更即时生效 |
+
+> 「禁用账号」测试通过直接改库完成（`UPDATE sys_user SET status='DISABLED'`），验证后已把测试账号从库中清理，演示数据保持 6 个账号。
+
+#### 4.2 自动化测试
+
+```powershell
+mvn -s ..\maven-settings.xml test
+```
+
+```
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0  -- AuthAndSecurityTest
+Tests run: 5,  Failures: 0, Errors: 0, Skipped: 0  -- ArticlePaginationTest
+Tests run: 15, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+`AuthAndSecurityTest` 走完整的 Security 过滤器链、使用真实签发的 JWT，覆盖：
+
+1. T01 正常登录（含断言响应中不存在 `passwordHash`）
+2. T02 错误密码，且**断言「账号不存在」与「密码错误」的 message 相等**
+3. T03 普通用户访问超管接口 403
+4. T03 管理员访问超管接口 403
+5. 未认证访问 401 且为统一 JSON 结构
+6. 伪造令牌 401
+7. 有效令牌解析出正确用户
+8. 同一账号两次登录的令牌互相独立且都可用
+9. 公开接口无需令牌
+10. 登录失败响应中不含任何 `token` 字样
+
+#### 4.3 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0，业务代码已按路由做动态 import，主包从 1015 kB 降到 874 kB |
+| 9 个新增/改动模块编译 | ✅ 全部 200 |
+| 走 5173 代理登录 `reviewer01` | ✅ HTTP 200，`roles=USER,REVIEWER`，令牌长度 271 |
+| SSR 渲染三页 | ✅ 登录页 len=5576（含演示账号、注册入口）、注册页 len=6144（含确认密码、角色说明）、个人中心 len=7018（含编辑表单、不可修改提示） |
+
+### 5. 本阶段产出文件
+
+```
+新增   security/JwtProperties.java
+新增   security/JwtTokenProvider.java
+新增   security/LoginUser.java
+新增   security/JwtAuthenticationFilter.java
+新增   security/SecurityConfig.java
+新增   security/RestAuthenticationEntryPoint.java
+新增   security/RestAccessDeniedHandler.java
+新增   security/SecurityUtils.java
+新增   config/CorsProperties.java
+新增   config/JacksonConfig.java
+重写   config/CorsConfig.java                         改为 CorsConfigurationSource Bean
+新增   modules/auth/AuthController.java
+新增   modules/auth/dto/LoginRequest.java
+新增   modules/auth/dto/RegisterRequest.java
+新增   modules/auth/service/AuthService.java
+新增   modules/auth/vo/LoginResponse.java
+新增   modules/user/UserController.java
+新增   modules/user/dto/UpdateProfileRequest.java
+新增   modules/user/entity/SysUser.java
+新增   modules/user/entity/SysRole.java
+新增   modules/user/entity/SysUserRole.java
+新增   modules/user/mapper/SysUserMapper.java         含角色联表查询
+新增   modules/user/mapper/SysRoleMapper.java
+新增   modules/user/mapper/SysUserRoleMapper.java
+新增   modules/user/service/UserService.java
+新增   modules/user/vo/UserProfileVO.java
+新增   src/test/java/.../AuthAndSecurityTest.java     10 个用例
+修改   modules/knowledge/entity/ScienceArticle.java   改用 Lombok @Data
+修改   pom.xml                                        Security、jjwt、lombok、security-test
+修改   application.yml                                app.jwt 配置段
+修改   application-local.yml（未入库）                 本机密钥
+修改   application-local-example.yml                  密钥生成命令
+新增   前端 src/api/auth.js
+新增   前端 src/api/user.js
+新增   前端 src/stores/user.js
+新增   前端 src/views/auth/LoginView.vue
+新增   前端 src/views/auth/RegisterView.vue
+新增   前端 src/views/user/ProfileView.vue
+重写   前端 src/router/index.js                        路由守卫
+重写   前端 src/layouts/DefaultLayout.vue              登录态与用户菜单
+重写   前端 src/api/request.js                         401 跳转登录
+新增   docs/认证与权限设计.md                          论文材料
+```
+
+### 6. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 令牌签发后无法主动撤销（无黑名单） | 改密码后旧令牌可用至过期 | P2，论文「不足与展望」说明 |
+| 2 | 无刷新令牌机制 | 过期需重新登录 | 2 小时有效期，演示无影响 |
+| 3 | 无登录失败次数限制 | 理论上可暴力尝试 | 答辩范围外，论文提及 |
+| 4 | 测试依赖真实数据库与 seed 数据 | 干净环境需先初始化 | README 已写明 |
+| 5 | 后端测试出现 Mockito self-attach 警告 | 无功能影响，JDK 未来版本会禁用 | 升级 JDK 时再处理 |
+
+### 7. 下一步建议
+
+进入**阶段 4：科普知识库**：
+
+1. 分类、文章、专题的只读接口（列表分页、详情、关键词搜索、按分类筛选、专题聚合）
+2. 后台文章维护接口（创建、编辑、发布、下架），走 `ADMIN` 权限
+3. 前端 `/knowledge`、`/knowledge/:id`、`/topics`、`/topics/:id`、`/admin/articles`、`/admin/categories`、`/admin/topics` 页面
+4. 静态资源目录落地（seed 中的 `/images/articles/*.svg` 封面），统一处理图片缺失的占位
+5. 补搜索与分页测试（T04），以及「游客可浏览已发布文章、看不到草稿」的权限测试

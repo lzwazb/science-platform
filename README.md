@@ -2,7 +2,7 @@
 
 > 本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现
 
-当前进度：**阶段 2（数据库与基础规范）已完成**。见 [开发日志](docs/development-log.md)。
+当前进度：**阶段 3（登录与角色权限）已完成**。见 [开发日志](docs/development-log.md)。
 
 ## 项目结构
 
@@ -40,12 +40,22 @@ mysql -u root -p --default-character-set=utf8mb4 -e "source seed.sql"
 
 演示账号与数据说明见 [database/README.md](database/README.md)。所有演示账号密码均为 `123456`。
 
-### 2. 配置数据库密码
+### 2. 配置数据库密码与 JWT 密钥
 
-复制 `science-platform-server/src/main/resources/application-local-example.yml` 为 `application-local.yml`，填入本机密码。
-该文件已被 `.gitignore` 忽略，**不要把真实密码提交到 Git**。
+复制 `science-platform-server/src/main/resources/application-local-example.yml` 为 `application-local.yml`，填入本机数据库密码与 JWT 密钥。
+该文件已被 `.gitignore` 忽略，**不要把真实密码或密钥提交到 Git**。
 
-也可以用环境变量覆盖：`DB_USERNAME`、`DB_PASSWORD`。
+JWT 密钥至少 32 字节，可用下面的命令生成：
+
+```powershell
+$b = New-Object byte[] 48
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
+[Convert]::ToBase64String($b)
+```
+
+也可以用环境变量覆盖：`DB_USERNAME`、`DB_PASSWORD`、`APP_JWT_SECRET`。
+
+> 密钥未配置时后端会**拒绝启动**并给出明确提示，这是有意设计，避免弱密钥上线。
 
 ### 3. 启动后端
 
@@ -86,6 +96,18 @@ npm run dev
 
 首页会真实调用健康检查接口，展示后端连接状态、数据库连接状态与已发布文章数。
 
+右上角可登录。登录页内置了五个演示账号的一键填充（密码均为 `123456`）：
+
+| 账号 | 角色 | 能做什么 |
+| --- | --- | --- |
+| `user01` | 普通用户 | 浏览、提交知识贡献、评论点赞收藏 |
+| `creator01` / `creator02` | 创作者 | 额外可发布作品、参加活动投稿 |
+| `reviewer01` | 评审员 | 审核知识贡献与作品、评审活动投稿 |
+| `admin01` | 管理员 | 管理分类、文章、作品、活动、反馈 |
+| `superadmin` | 超级管理员 | 额外可管理账号与角色 |
+
+登录后右上角显示昵称与角色，可进入「个人中心」修改昵称、头像、邮箱与简介。
+
 ### 5. 构建与测试
 
 ```powershell
@@ -110,7 +132,7 @@ npm run build
 | 0 | 环境核验 | ✅ 已完成 |
 | 1 | 项目骨架与前后端连通 | ✅ 已完成 |
 | 2 | 数据库与基础规范 | ✅ 已完成 |
-| 3 | 登录和角色权限 | ⬜ 未开始 |
+| 3 | 登录和角色权限 | ✅ 已完成 |
 | 4 | 科普知识库 | ⬜ 未开始 |
 | 5 | 作品管理 | ⬜ 未开始 |
 | 6 | 知识共建核心（贡献/审核/版本） | ⬜ 未开始 |
@@ -128,6 +150,7 @@ npm run build
 ## 文档索引
 
 - [环境核验记录](docs/environment.md)
+- [认证与权限设计](docs/认证与权限设计.md)
 - [接口约定](docs/api-contract.md)
 - [数据库设计（ER 图与设计决策）](docs/数据库设计/README.md)
 - [数据字典](docs/数据库设计/数据字典.md)

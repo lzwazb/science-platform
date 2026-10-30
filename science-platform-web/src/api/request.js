@@ -15,10 +15,12 @@ const request = axios.create({
   },
 })
 
-// 请求拦截：携带认证令牌（阶段 3 登录功能接入后生效，未登录时无令牌则跳过）
+const TOKEN_KEY = 'token'
+
+// 请求拦截：携带认证令牌
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem(TOKEN_KEY)
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -26,6 +28,12 @@ request.interceptors.request.use(
   },
   (error) => Promise.reject(error),
 )
+
+/** 登录页与注册页本身不需要跳转，避免 401 循环跳转 */
+function isAuthPage() {
+  const path = window.location.pathname
+  return path.startsWith('/login') || path.startsWith('/register')
+}
 
 // 响应拦截：统一解包后端 { code, message, data, timestamp } 结构
 request.interceptors.response.use(
@@ -47,14 +55,19 @@ request.interceptors.response.use(
     let message = serverMessage || '网络异常，请稍后重试'
 
     if (status === 401) {
-      message = '登录状态已失效，请重新登录'
-      localStorage.removeItem('token')
+      message = serverMessage || '登录状态已失效，请重新登录'
+      localStorage.removeItem(TOKEN_KEY)
+      // 令牌过期或未登录访问受保护接口：带回原路径，登录后可直接跳回
+      if (!isAuthPage()) {
+        const redirect = encodeURIComponent(window.location.pathname + window.location.search)
+        window.location.href = `/login?redirect=${redirect}`
+      }
     } else if (status === 403) {
-      message = '没有权限执行该操作'
+      message = serverMessage || '没有权限执行该操作'
     } else if (status === 404) {
-      message = '请求的资源不存在'
+      message = serverMessage || '请求的资源不存在'
     } else if (status >= 500) {
-      message = '服务端异常，请稍后重试'
+      message = serverMessage || '服务端异常，请稍后重试'
     } else if (error.code === 'ECONNABORTED') {
       message = '请求超时，请检查后端服务是否已启动'
     }

@@ -54,9 +54,22 @@
 
 ### 1.4 认证
 
-- 阶段 3 起启用 JWT，请求头携带 `Authorization: Bearer <token>`
+- 使用 JWT（HS512），登录后在请求头携带 `Authorization: Bearer <token>`
+- 默认有效期 120 分钟，过期或非法令牌统一返回 401
 - 操作者身份**一律从后端认证上下文获取**，不接受前端传入 `reviewerId`、`roleCode` 等身份字段作为授权依据
 - 前端路由守卫只改善体验，真实授权在后端完成
+- 详细设计见 [认证与权限设计](认证与权限设计.md)
+
+**受保护接口一览**（阶段 3 的授权规则，越具体的规则越靠前）：
+
+| 路径模式 | 访问要求 |
+| --- | --- |
+| `OPTIONS /**` | 放行（CORS 预检） |
+| `/api/v1/health`、`/api/v1/auth/login`、`/api/v1/auth/register` | 公开 |
+| `GET /api/v1/articles/**` 等只读内容接口 | 公开（游客可浏览） |
+| `/api/v1/admin/users/**` | `SUPER_ADMIN` |
+| `/api/v1/admin/**` | `ADMIN` 及以上 |
+| 其他 | 需登录 |
 
 ### 1.5 错误响应示例
 
@@ -137,17 +150,121 @@ GET /api/v1/health
 
 **实现位置**：`science-platform-server/src/main/java/com/science/platform/modules/system/HealthController.java`
 
+### 2.2 注册
+
+```
+POST /api/v1/auth/register
+Content-Type: application/json
+```
+
+无需认证。只能注册普通用户（`USER` 角色），请求体中没有角色字段。
+
+| 字段 | 类型 | 必填 | 校验 |
+| --- | --- | --- | --- |
+| `username` | string | 是 | 3–20 位，仅字母/数字/下划线，全局唯一 |
+| `password` | string | 是 | 6–32 位 |
+| `nickname` | string | 是 | ≤ 20 位 |
+| `email` | string | 否 | 邮箱格式，≤ 100 位 |
+
+**成功响应**（实测）：
+
+```json
+{
+  "code": 200,
+  "message": "注册成功，请登录",
+  "data": {
+    "id": 7,
+    "username": "test9388",
+    "nickname": "测试用户",
+    "avatar": null,
+    "email": "test9388@example.com",
+    "bio": null,
+    "status": "ACTIVE",
+    "roles": ["USER"],
+    "createdAt": "2026-10-30 13:30:28"
+  },
+  "timestamp": "2026-10-30 13:30:28"
+}
+```
+
+**失败响应**：用户名被占用 → `400 用户名已被占用`；字段校验失败 → `400`，消息为中文拼接（实测 `nickname 昵称不能为空；username 用户名长度需在 3 到 20 个字符之间；password 密码长度需在 6 到 32 个字符之间`）。
+
+### 2.3 登录
+
+```
+POST /api/v1/auth/login
+Content-Type: application/json
+```
+
+无需认证。
+
+```json
+{ "username": "admin01", "password": "123456" }
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "token": "eyJhbGciOiJIUzUxMiJ9...",
+    "expiresIn": 7200,
+    "tokenType": "Bearer",
+    "user": { "id": 2, "username": "admin01", "nickname": "内容管理员", "roles": ["ADMIN"], "createdAt": "2026-01-05 09:05:00" }
+  },
+  "timestamp": "2026-10-30 13:28:34"
+}
+```
+
+**失败响应**：
+
+| 场景 | 状态码 | message |
+| --- | --- | --- |
+| 账号不存在 | 401 | 用户名或密码错误 |
+| 密码错误 | 401 | 用户名或密码错误 |
+| 账号被禁用 | 403 | 账号已被禁用，请联系管理员 |
+
+前两种必须返回完全相同的 message，防止被用来枚举用户名。
+
+### 2.4 获取当前登录用户
+
+```
+GET /api/v1/auth/me
+Authorization: Bearer <token>
+```
+
+返回结构与注册响应中的 `data` 一致（`UserProfileVO`）。用户 ID 取自令牌，不接受请求参数。
+
+### 2.5 个人资料
+
+```
+GET /api/v1/users/me      # 查看本人资料
+PUT /api/v1/users/me      # 更新本人资料
+Authorization: Bearer <token>
+```
+
+`PUT` 只接受以下字段，未传或传 `null` 表示不修改：
+
+| 字段 | 类型 | 校验 |
+| --- | --- | --- |
+| `nickname` | string | ≤ 20 位，不允许纯空白 |
+| `avatar` | string | ≤ 255 位 |
+| `email` | string | 邮箱格式，≤ 100 位 |
+| `bio` | string | ≤ 500 位 |
+
+用户名、角色、账号状态**不在可修改范围内**（开发档案 FR-ME-01）。
+
+实测：`PUT` 非法邮箱返回 `400 email 邮箱格式不正确`。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
+（阶段 3 已实现认证与个人资料 5 个接口，见 2.2–2.5。）
 
 | 模块 | 方法 | 路径 | 用途 | 计划阶段 |
 | --- | --- | --- | --- | --- |
-| 认证 | POST | `/auth/register` | 公开注册普通用户 | 3 |
-| 认证 | POST | `/auth/login` | 登录并返回认证信息 | 3 |
-| 认证 | GET | `/auth/me` | 获取当前登录用户 | 3 |
-| 用户 | GET | `/users/me` | 查看个人资料 | 3 |
-| 用户 | PUT | `/users/me` | 更新可编辑个人资料 | 3 |
 | 知识 | GET | `/articles` | 分页查询已发布文章 | 4 |
 | 知识 | GET | `/articles/{id}` | 查看文章详情 | 4 |
 | 知识 | GET | `/articles/search?keyword=` | 关键词搜索 | 4 |
