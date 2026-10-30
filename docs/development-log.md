@@ -1286,3 +1286,193 @@ BUILD SUCCESS
 3. 优秀作品确认与展示
 4. 前端 `/events`、`/events/:id`、`/review/events`、后台活动管理
 5. 补测试：T11 活动时间校验、重复投稿拒绝、未评审作品不得标为优秀
+
+---
+
+## 2026-10-30 · 阶段 8：主题活动
+
+**目标**（开发档案第 11 章）：活动管理、投稿、评审、优秀作品展示，达成「从活动发布到结果展示流程完整」。
+
+### 1. 后端实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `event/entity/CreativeEvent` / `EventSubmission` / `EventReview` | 三张表实体 |
+| `event/service/EventService` | 活动 CRUD、发布、结束、**时间状态判定** |
+| `event/service/EventSubmissionService` | 投稿、我的投稿、评审列表、组装（含均分统计） |
+| `event/service/EventReviewService` | 打分（upsert）、确认优秀作品、撤销获奖 |
+| `event/EventController` | 公开列表与详情 |
+| `event/EventSubmissionController` | 投稿 |
+| `event/EventReviewController` | 评审台 |
+| `event/AdminEventController` | 后台活动管理与获奖确认 |
+
+### 2. 关键设计：时间状态现算，不落库
+
+活动表里只有 `startAt` / `endAt` 与**管理状态**（DRAFT / PUBLISHED / CLOSED / CANCELLED）。
+前台看到的「未开始 / 进行中 / 已结束」是每次读取时按当前时间算出来的：
+
+```java
+if (DRAFT 或 CANCELLED) return UNPUBLISHED;
+if (CLOSED)             return ENDED;
+if (now < startAt)      return NOT_STARTED;
+if (now > endAt)        return ENDED;
+return ONGOING;
+```
+
+理由：如果把「进行中」也存成字段，就需要定时任务去翻状态，一旦任务没跑或跑晚了，
+就会出现「时间已过但状态还是进行中，用户还能投稿」的问题。现算没有这个窗口期。
+
+**自查发现的 bug**：初版只判断 `PUBLISHED`，导致**管理员手动结束的活动被报成「未发布」**
+（`timeStatus=UNPUBLISHED`，前台显示「未发布」而不是「已结束」）。
+修正为上面的四段判断后，活动 2 正确显示为 `ENDED`。
+
+### 3. 关键设计：获奖必须有人工评审依据
+
+开发档案 FR-EV-05 明确「不得把未评审作品自动标为优秀」。实现方式：
+
+- 获奖名单由管理员**显式提交**，不提供「按分数自动排序并标优」的旁路
+- 提交时逐个校验 `event_review` 里是否有该投稿的记录，任何一条没有就**整体拒绝**
+- 前端确认对话框里，未评审的投稿其获奖下拉框直接禁用
+
+**实测**：给一条刚投递、没有任何评审的投稿标「优秀奖」→
+`400 投稿 #4 还没有任何评审记录，不能直接标为优秀`，且该投稿的 `award_level` 未被写入。
+
+### 4. 验证（真实运行）
+
+#### 4.1 时间状态与投稿校验（T11）
+
+| 场景 | 实测 |
+| --- | --- |
+| 活动列表 | 活动 1 `ONGOING` / 可投稿；活动 2 `ENDED` / 不可投稿 |
+| 向已结束活动投稿 | `400 活动已结束，不能再投稿` |
+| 向未开始活动投稿 | `400 活动尚未开始，暂不能投稿` |
+| 提交他人作品 | `403 只能提交自己的作品` |
+| 重复投稿同一作品 | `400 该作品已报名本活动，不能重复投稿` |
+| 普通用户投稿 | `403` |
+| 未登录读「我的投稿」 | `401`（未被公开规则放行） |
+| 草稿活动前台 | `404`，且不在列表中 |
+
+#### 4.2 评审
+
+| 场景 | 实测 |
+| --- | --- |
+| 打分 5 分 | 提交状态，评审数 1，均分 5.0 |
+| 同一评审员再评 4 分 | 评审数仍 1，均分变 4.0（覆盖而非新增） |
+| 评分 9 分 | `400 score 评分最高 5 分` |
+| 不填评语 | `400 comment 请填写评语` |
+| 创作者访问评审台 | `403` |
+
+#### 4.3 获奖确认
+
+| 场景 | 实测 |
+| --- | --- |
+| 确认两件已评审作品获奖 | `200`，活动详情的 `awards` 返回两件，带均分 |
+| 给未评审投稿标优秀 | `400 投稿 #4 还没有任何评审记录…` |
+| 提交不属于该活动的投稿 | `400 投稿 3 不属于本活动` |
+| 评审员提交获奖名单 | `403` |
+| 操作日志 | 新增 `EVENT_AWARD_CONFIRM` 记录 |
+
+#### 4.4 自动化测试
+
+```
+Tests run: 10  AuthAndSecurityTest
+Tests run: 13  ContributionApiTest
+Tests run: 2   ContributionTransactionTest
+Tests run: 21  EventApiTest
+Tests run: 13  InteractionApiTest
+Tests run: 5   ArticlePaginationTest
+Tests run: 13  KnowledgeApiTest
+Tests run: 18  WorkApiTest
+Tests run: 95, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+`EventApiTest` 覆盖 21 项：时间状态、草稿不可见、T11 两种时间拒绝、他作品拒绝、重复投稿、
+普通用户拒绝、投稿进我的列表、未登录 401、评审 upsert、评分校验、创作者拒绝、
+未评审不得获奖、已评审可获奖、评审员拒绝确认、跨活动投稿拒绝、时间范围校验、
+发布进入进行中、结束停止投稿、后台权限。
+
+**测试稳定性教训（第二次遇到）**：初次运行有 3 个用例失败，
+其中 2 个是因为**手工验证时在演示数据里留下了投稿记录**（work3 已报名活动 1），
+导致「首次投稿应成功」的断言拿到 400。重新执行 `seed.sql` 后恢复。
+
+另 1 个是断言写错：`reviewIsUpsert` 里用「该评审员对该投稿的评审数 + 1」期盼总评审数，
+但 seed 里已经有该评审员的记录，实际是「更新」而不是「新增」。
+改成「记录条数前后不变、分数被更新」才正确。
+
+> 结论：涉及计数的断言应该只依赖本次测试自己造成的状态变化，
+> 或者先显式把状态归零再断言。
+
+#### 4.5 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0 |
+| 5 个新增模块编译 | ✅ 全部 200 |
+| 走代理取活动列表 | ✅ 活动 1 `ONGOING`、活动 2 `ENDED` |
+| SSR 渲染活动列表 | ✅ len=4580 |
+| SSR 渲染活动详情 | ✅ len=2345 |
+| SSR 渲染后台活动管理 | ✅ len=4012，含「新建活动」 |
+| SSR 渲染活动评审台 | ✅ len=5193 |
+
+### 5. 本阶段产出文件
+
+```
+后端新增：
+  event/entity/CreativeEvent.java
+  event/entity/EventSubmission.java
+  event/entity/EventReview.java
+  event/mapper/CreativeEventMapper.java
+  event/mapper/EventSubmissionMapper.java
+  event/mapper/EventReviewMapper.java
+  event/dto/EventSaveRequest.java
+  event/dto/SubmitWorkRequest.java
+  event/dto/SubmissionReviewRequest.java
+  event/dto/AwardRequest.java
+  event/vo/EventListItemVO.java
+  event/vo/EventDetailVO.java
+  event/vo/SubmissionListItemVO.java
+  event/vo/AwardVO.java
+  event/service/EventService.java
+  event/service/EventSubmissionService.java
+  event/service/EventReviewService.java
+  event/EventController.java
+  event/EventSubmissionController.java
+  event/EventReviewController.java
+  event/AdminEventController.java
+  src/test/java/.../EventApiTest.java（21 用例）
+
+后端修改：
+  security/SecurityConfig.java（我的投稿需登录、投稿需 CREATOR）
+
+前端新增：
+  src/api/event.js
+  src/views/event/EventListView.vue
+  src/views/event/EventDetailView.vue
+  src/views/admin/AdminEventView.vue
+  src/views/review/ReviewEventsView.vue
+
+前端修改：
+  src/router/index.js（活动列表/详情、后台活动管理、活动评审四条路由）
+  src/layouts/DefaultLayout.vue（导航开放主题活动、加活动评审入口）
+  src/layouts/AdminLayout.vue（后台菜单加活动管理）
+```
+
+### 6. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 活动到期后管理状态仍是 PUBLISHED（只体现在 timeStatus） | 后台可手动「结束」 | 可加定时任务自动置 CLOSED，但档案未要求 |
+| 2 | 获奖后没有站内通知 | 阶段 9 做通知时补 | 阶段 9 |
+| 3 | 投稿不支持撤回 | 档案列为可选（WITHDRAWN 状态） | 视剩余时间 |
+| 4 | 评审明细（每条评语）未在前台展示 | 只展示均分 | 可加「评审摘要」展示 |
+
+### 7. 下一步建议
+
+进入**阶段 9：个人中心与站内消息**：
+
+1. 站内消息：列表、未读数、标记已读（阶段 6 已有写入能力，补查询侧）
+2. 个人中心整合：我的作品、我的贡献、我的收藏、我的投稿、我的反馈
+3. 超级管理员的账号与角色管理（`/admin/users`）
+4. 前端：`/notifications`、个人中心 tab 化、后台用户管理
+5. 补测试：T12 消息隔离（用户 A 查不到用户 B 的消息）

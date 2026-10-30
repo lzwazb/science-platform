@@ -67,6 +67,18 @@ const routes = [
         meta: { title: '创作者中心', requiresAuth: true, roles: ['CREATOR', 'ADMIN', 'SUPER_ADMIN'] },
       },
       {
+        path: 'events',
+        name: 'events',
+        component: () => import('@/views/event/EventListView.vue'),
+        meta: { title: '主题活动' },
+      },
+      {
+        path: 'events/:id',
+        name: 'event-detail',
+        component: () => import('@/views/event/EventDetailView.vue'),
+        meta: { title: '活动详情' },
+      },
+      {
         path: 'contributions/mine',
         name: 'my-contributions',
         component: () => import('@/views/contribution/MyContributionsView.vue'),
@@ -83,6 +95,12 @@ const routes = [
         name: 'review-contributions',
         component: () => import('@/views/contribution/ReviewContributionsView.vue'),
         meta: { title: '知识贡献审核', requiresAuth: true, roles: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
+      },
+      {
+        path: 'review/events',
+        name: 'review-events',
+        component: () => import('@/views/review/ReviewEventsView.vue'),
+        meta: { title: '活动评审', requiresAuth: true, roles: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
       },
       {
         path: 'review/works',
@@ -140,6 +158,12 @@ const routes = [
             name: 'admin-feedback',
             component: () => import('@/views/admin/AdminFeedbackView.vue'),
             meta: { title: '内容反馈' },
+          },
+          {
+            path: 'events',
+            name: 'admin-events',
+            component: () => import('@/views/admin/AdminEventView.vue'),
+            meta: { title: '活动管理' },
           },
         ],
       },

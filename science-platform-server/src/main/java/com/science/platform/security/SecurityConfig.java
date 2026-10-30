@@ -66,6 +66,8 @@ public class SecurityConfig {
                         // 预检请求直接放行，否则浏览器拿不到 CORS 响应头
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        // 我的投稿属于个人数据，不能被 /events/** 的公开规则放行，必须写在前面
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/*/submissions/**").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         // 账号与角色管理只对超级管理员开放
                         .requestMatchers("/api/v1/admin/users/**").hasRole("SUPER_ADMIN")
@@ -73,6 +75,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // 创作者中心：创作者、管理员、超级管理员
                         .requestMatchers("/api/v1/creator/**").hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
+                        // 投稿：创作者及以上
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events/*/submissions")
+                        .hasAnyRole("CREATOR", "ADMIN", "SUPER_ADMIN")
                         // 审核工作台：评审员、管理员、超级管理员
                         .requestMatchers("/api/v1/review/**").hasAnyRole("REVIEWER", "ADMIN", "SUPER_ADMIN")
                         .anyRequest().authenticated())
