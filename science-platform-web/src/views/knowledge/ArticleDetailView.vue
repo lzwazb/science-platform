@@ -1,7 +1,9 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { getArticleDetail } from '@/api/article'
+import { listArticleVersions, submitContribution } from '@/api/contribution'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -33,7 +35,93 @@ async function fetchDetail() {
   }
 }
 
-watch(articleId, fetchDetail)
+// ---------------- 提交纠错 ----------------
+
+const contributeVisible = ref(false)
+const contributing = ref(false)
+const contributeFormRef = ref(null)
+
+const contributeForm = reactive({
+  contributionType: 'CORRECTION',
+  suggestedContent: '',
+  reason: '',
+  referenceSource: '',
+})
+
+const contributeRules = {
+  contributionType: [{ required: true, message: '请选择建议类型', trigger: 'change' }],
+  suggestedContent: [
+    { required: true, message: '请填写建议内容', trigger: 'blur' },
+    { max: 5000, message: '建议内容不能超过 5000 个字符', trigger: 'blur' },
+  ],
+  reason: [
+    { required: true, message: '请说明提交理由', trigger: 'blur' },
+    { max: 1000, message: '提交理由不能超过 1000 个字符', trigger: 'blur' },
+  ],
+  referenceSource: [
+    { required: true, message: '请填写参考来源，便于评审核实', trigger: 'blur' },
+    { max: 500, message: '参考来源不能超过 500 个字符', trigger: 'blur' },
+  ],
+}
+
+function openContribute() {
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  contributeForm.contributionType = 'CORRECTION'
+  contributeForm.suggestedContent = ''
+  contributeForm.reason = ''
+  contributeForm.referenceSource = ''
+  contributeVisible.value = true
+}
+
+async function handleContribute() {
+  if (!contributeFormRef.value) return
+  const valid = await contributeFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  contributing.value = true
+  try {
+    await submitContribution({
+      articleId: Number(articleId.value),
+      contributionType: contributeForm.contributionType,
+      suggestedContent: contributeForm.suggestedContent.trim(),
+      reason: contributeForm.reason.trim(),
+      referenceSource: contributeForm.referenceSource.trim(),
+    })
+    contributeVisible.value = false
+    ElMessage.success('建议已提交，可在「我的贡献」中查看审核进度')
+  } catch {
+    // 错误已提示
+  } finally {
+    contributing.value = false
+  }
+}
+
+// ---------------- 版本历史 ----------------
+
+const versionsVisible = ref(false)
+const versionsLoading = ref(false)
+const versions = ref([])
+
+async function openVersions() {
+  versionsVisible.value = true
+  if (versions.value.length > 0) return
+  versionsLoading.value = true
+  try {
+    versions.value = await listArticleVersions(articleId.value)
+  } catch {
+    versions.value = []
+  } finally {
+    versionsLoading.value = false
+  }
+}
+
+watch(articleId, () => {
+  versions.value = []
+  fetchDetail()
+})
 onMounted(fetchDetail)
 </script>
 
@@ -101,26 +189,123 @@ onMounted(fetchDetail)
           <el-divider />
 
           <div class="article-actions">
-            <el-tooltip content="知识共建功能在阶段 6 开放" placement="top">
-              <span>
-                <el-button disabled>提交纠错 / 补充</el-button>
-              </span>
-            </el-tooltip>
+            <el-button type="primary" @click="openContribute">提交纠错 / 补充</el-button>
+            <el-button @click="openVersions">版本历史</el-button>
             <el-tooltip content="社区互动在阶段 7 开放" placement="top">
               <span>
                 <el-button disabled>点赞 / 收藏</el-button>
               </span>
             </el-tooltip>
             <span v-if="!userStore.isLoggedIn" class="article-actions__hint">
-              登录后可参与知识共建与互动
+              登录后可提交纠错建议
             </span>
           </div>
 
           <p class="article-foot__note">
-            本文为演示用科普内容，参考来源已在正文末尾标注。发现表述不准确？欢迎在功能开放后提交纠错建议。
+            发现表述不准确或缺少来源？点击「提交纠错 / 补充」，填写理由与参考来源后进入审核流程。
+            建议被采纳时，正式文章会更新，本页的版本历史会记录这次修改。
           </p>
         </footer>
       </article>
+
+      <!-- 提交纠错对话框 -->
+      <el-dialog v-model="contributeVisible" title="提交纠错 / 补充建议" width="640px" destroy-on-close>
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          title="建议会进入审核流程"
+          description="评审员会对照原文核实你的建议；通过后才更新正式文章并保存历史版本。请尽量附上可查证的参考来源。"
+          class="contribute-tip"
+        />
+
+        <el-form
+          ref="contributeFormRef"
+          :model="contributeForm"
+          :rules="contributeRules"
+          label-width="90px"
+        >
+          <el-form-item label="建议类型" prop="contributionType">
+            <el-radio-group v-model="contributeForm.contributionType">
+              <el-radio value="SUPPLEMENT">补充知识</el-radio>
+              <el-radio value="CORRECTION">纠正错误</el-radio>
+              <el-radio value="MODIFICATION">修改建议</el-radio>
+            </el-radio-group>
+          </el-form-item>
+
+          <el-form-item label="建议内容" prop="suggestedContent">
+            <el-input
+              v-model="contributeForm.suggestedContent"
+              type="textarea"
+              :rows="5"
+              maxlength="5000"
+              show-word-limit
+              placeholder="可以写建议修改的片段，也可以给出改写后的完整段落"
+            />
+          </el-form-item>
+
+          <el-form-item label="提交理由" prop="reason">
+            <el-input
+              v-model="contributeForm.reason"
+              type="textarea"
+              :rows="3"
+              maxlength="1000"
+              show-word-limit
+              placeholder="说明原文哪里不准确、为什么不准确"
+            />
+          </el-form-item>
+
+          <el-form-item label="参考来源" prop="referenceSource">
+            <el-input
+              v-model="contributeForm.referenceSource"
+              maxlength="500"
+              placeholder="教材、机构官网或公开文献，便于评审核实"
+            />
+          </el-form-item>
+        </el-form>
+
+        <template #footer>
+          <el-button @click="contributeVisible = false">取消</el-button>
+          <el-button type="primary" :loading="contributing" @click="handleContribute">
+            提交审核
+          </el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 版本历史抽屉 -->
+      <el-drawer v-model="versionsVisible" title="版本历史" size="520px">
+        <div v-loading="versionsLoading">
+          <el-empty
+            v-if="!versionsLoading && versions.length === 0"
+            description="这篇文章还没有经过纠错更新"
+            :image-size="80"
+          />
+
+          <el-timeline v-else>
+            <el-timeline-item
+              v-for="version in versions"
+              :key="version.id"
+              :timestamp="version.createdAt"
+              placement="top"
+            >
+              <div class="version-item">
+                <strong>第 {{ version.versionNo }} 版</strong>
+                <p>{{ version.changeNote || '内容更新' }}</p>
+                <span class="version-item__meta">
+                  操作人：{{ version.operatorName || '—' }}
+                  <template v-if="version.sourceContributionId">
+                    · 来源建议 #{{ version.sourceContributionId }}
+                  </template>
+                </span>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+
+          <p class="version-note">
+            当前页面展示的是第 {{ article?.versionNo }} 版（最新版）。历史上的每一版都在这里留有快照。
+          </p>
+        </div>
+      </el-drawer>
 
       <!-- 关联创意作品（阶段 5 起） -->
       <section class="article-related">
@@ -353,6 +538,36 @@ onMounted(fetchDetail)
 
 .article-work-card__author {
   font-size: 11px;
+  color: var(--sp-text-faint);
+}
+
+.contribute-tip {
+  margin-bottom: 18px;
+}
+
+.version-item strong {
+  font-size: 14px;
+  color: var(--sp-text-strong);
+}
+
+.version-item p {
+  margin: 6px 0 4px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--sp-text);
+}
+
+.version-item__meta {
+  font-size: 12px;
+  color: var(--sp-text-faint);
+}
+
+.version-note {
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px dashed var(--sp-border);
+  font-size: 12px;
+  line-height: 1.7;
   color: var(--sp-text-faint);
 }
 

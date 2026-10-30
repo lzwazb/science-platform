@@ -451,21 +451,88 @@ PUBLISHED ──编辑──> PENDING（自动重新送审）
 **并发防护**：三个动作都要求操作前状态为 `PENDING`（下架要求 `PUBLISHED`），
 否则返回 `400 该作品当前状态为已发布，不能进行审核`。这样可以防止两位评审员同时点「通过」造成状态错乱。
 
+### 2.14 知识贡献（提交与个人）
+
+需登录。游客不能提交贡献。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| POST | `/api/v1/contributions` | 提交补充 / 纠错 / 修改建议 |
+| GET | `/api/v1/contributions/mine` | 我的贡献，支持 `status` 筛选 |
+| GET | `/api/v1/contributions/{id}` | 查看本人某条贡献，**非本人 403** |
+| POST | `/api/v1/contributions/{id}/withdraw` | 撤回仍在审核中的建议 |
+
+**请求体**（四个字段全部必填）：
+
+| 字段 | 类型 | 校验 |
+| --- | --- | --- |
+| `articleId` | long | 必须指向已发布文章 |
+| `contributionType` | string | `SUPPLEMENT` / `CORRECTION` / `MODIFICATION` |
+| `suggestedContent` | string | 非空，≤ 5000 字 |
+| `reason` | string | 非空，≤ 1000 字 |
+| `referenceSource` | string | 非空，≤ 500 字（档案「推荐必填」按必填补齐） |
+
+**实测**：四字段缺失时返回 `400 reason 提交理由不能为空；referenceSource 参考来源不能为空；suggestedContent 建议内容不能为空`，且数据库无新增记录。
+
+### 2.15 知识贡献审核
+
+需 `REVIEWER`、`ADMIN` 或 `SUPER_ADMIN`。创作者访问返回 403（实测）。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/review/contributions` | 列表，**默认 `status=PENDING`**，可按 `articleId` 过滤 |
+| GET | `/api/v1/review/contributions/{id}` | 审核详情，含文章当前正文供对照 |
+| POST | `/api/v1/review/contributions/{id}/approve` | 通过，body `{"comment": "...", "finalContent": "..."}` |
+| POST | `/api/v1/review/contributions/{id}/reject` | 驳回，`comment` 必填 |
+
+**审核通过的事务边界**（开发档案 5.1，本项目最关键的约束）：
+
+```
+BEGIN
+  1. 校验贡献状态为 PENDING，读取目标文章
+  2. 写历史版本快照（version_no = 文章当前版本号，内容是「被覆盖之前的旧正文」）
+  3. 更新文章：正文替换为 finalContent，version_no + 1
+  4. 条件更新贡献状态 PENDING → APPROVED（带 status 条件，防并发重复处理）
+  5. 写操作日志 CONTRIBUTION_APPROVE
+  6. 生成站内通知（接收人 = 提交者）
+COMMIT
+```
+
+任一步失败整体回滚。第 4 步的 `affected == 0`（被并发处理）也会抛异常触发回滚，
+避免出现「版本快照已写但状态没改」的中间态。
+
+**`finalContent` 的作用**：开发档案 5.1 要求「通过时必须明确最终采用的修改内容」。
+评审员在通过时可提交自己合并后的完整正文；不传则后端以 `suggestedContent` 作为新正文。
+
+**实测（T08）**：对文章 8 提交纠错并通过后，
+文章 `version_no` 1 → 2、正文 523 → 596 字；
+`article_version` 新增 `version_no=1` 快照，内容为变更前的 523 字，`source_contribution_id` 指向该贡献；
+`sys_notification` 新增 1 条 `REVIEW_RESULT` 通知给提交者；`sys_operation_log` 新增 1 条审核记录。
+
+### 2.16 文章版本历史
+
+```
+GET /api/v1/articles/{id}/versions
+GET /api/v1/articles/{id}/versions/{versionNo}
+```
+
+无需认证（已发布文章的版本历史公开，体现内容可追溯）。未发布文章要求评审员及以上，否则 404。
+
+列表按 `versionNo` 倒序；不存在的版本返回 `404 该版本不存在`。
+
+**版本号语义**：`science_article.version_no = N` 表示当前是第 N 版；
+`article_version` 里存的是**已被覆盖的旧内容**，所以最多到 `N-1`。
+详见 [数据库设计](数据库设计/README.md#51-为什么-article_versionversion_no-表示变更前的内容)。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
 （阶段 3 已实现认证与个人资料 5 个接口，阶段 4 实现知识库与后台内容维护 20 个接口，
-阶段 5 实现作品公开 / 创作者 / 审核 13 个接口，见 2.2–2.13。）
+阶段 5 实现作品公开 / 创作者 / 审核 13 个接口，阶段 6 实现知识贡献 / 审核 / 版本 8 个接口，
+见 2.2–2.16。）
 
 | 模块 | 方法 | 路径 | 用途 | 计划阶段 |
 | --- | --- | --- | --- | --- |
-| 知识贡献 | POST | `/contributions` | 提交知识贡献 | 6 |
-| 知识贡献 | GET | `/contributions/mine` | 查看本人贡献记录 | 6 |
-| 知识审核 | GET | `/reviews/contributions` | 查看待审核贡献 | 6 |
-| 知识审核 | POST | `/reviews/contributions/{id}/approve` | 通过贡献并更新文章版本 | 6 |
-| 知识审核 | POST | `/reviews/contributions/{id}/reject` | 驳回贡献并填写意见 | 6 |
-| 版本 | GET | `/articles/{id}/versions` | 查看文章版本列表 | 6 |
-| 版本 | GET | `/articles/{id}/versions/{versionNo}` | 查看某历史版本 | 6 |
 | 互动 | POST | `/interactions/likes` | 点赞 | 7 |
 | 互动 | DELETE | `/interactions/likes` | 取消点赞 | 7 |
 | 互动 | POST | `/interactions/favorites` | 收藏 | 7 |

@@ -896,3 +896,196 @@ BUILD SUCCESS
 3. 版本历史接口（列表、指定版本详情）
 4. 前端 `/contributions/mine`、`/review/contributions`、文章详情的纠错入口、版本历史展示
 5. 补测试：T06 缺少建议内容、T07 驳回、T08 通过并生成版本、T09 事务回滚
+
+---
+
+## 2026-10-30 · 阶段 6：知识共建与审核（核心模块）
+
+**目标**（开发档案第 11 章）：贡献提交、审核、正式文章更新、历史版本、通知，达成「审核流程闭环；事务和版本测试通过」。
+
+### 1. 后端实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `contribution/entity/KnowledgeContribution`、`ArticleVersion` | 贡献与历史版本实体 |
+| `contribution/service/ContributionService` | 提交、我的贡献、详情、撤回 |
+| `contribution/service/ContributionReviewService` | **核心**：审核工作台、通过（六步事务）、驳回 |
+| `contribution/service/ArticleVersionService` | 版本列表与指定版本快照 |
+| `notification/entity/SysNotification` + `service/NotificationService` | 阶段 6 只做写入，供审核事务内调用 |
+| `system/entity/SysOperationLog` + `service/OperationLogService` | 关键操作留痕 |
+| `contribution/ContributionController` | 提交与个人查询 |
+| `contribution/ContributionReviewController` | `/review/contributions`，评审员及以上 |
+| `contribution/ArticleVersionController` | `/articles/{id}/versions`，公开 |
+
+### 2. 审核通过的事务设计（重点）
+
+开发档案 5.1 规定的六步必须在**一个事务**内完成，否则会出现「文章改了但没历史版本」「贡献显示通过但文章没更新」这类不可修复的不一致：
+
+```java
+@Transactional
+public ContributionDetailVO approve(Long id, ContributionReviewRequest req, Long reviewerId) {
+    // 1. 校验状态 PENDING，读取文章
+    // 2. 写历史版本快照（version_no = 文章当前版本号，内容是「旧正文」）
+    // 3. 更新文章：正文替换 + version_no + 1
+    // 4. 条件更新贡献状态：WHERE id = ? AND status = 'PENDING'
+    //    若 affected == 0 → 抛异常（并发下已被别人处理），整个事务回滚
+    // 5. 写操作日志
+    // 6. 生成站内通知
+}
+```
+
+**关键点**：第 4 步用「带状态条件的 UPDATE」而不是先查后改。如果两个评审员同时点通过，
+第二个人的 `affected` 会是 0，直接抛异常回滚——不会产生两条版本快照或两次通知。
+第 1 步的预检查只是为了给出更友好的错误提示，真正的互斥靠第 4 步。
+
+**`finalContent` 的处理**：档案要求「明确最终采用的修改内容」。评审员可以提交自己合并后的完整正文；
+不传则回落到 `suggestedContent`。审核工作台默认把原文填进编辑框，评审员把建议合并进去再提交。
+
+### 3. 又一个 MyBatis-Plus 相关的注意点
+
+阶段 5 记下的「null 字段不会进 SET 子句」在本阶段同样适用，所以贡献状态更新、审核意见写入、
+`finalContent` 清空都统一用 `LambdaUpdateWrapper` 逐列 set，而不是 `updateById(entity)`。
+
+另外发现一个测试侧的坑：`BaseMapper` 有 `insert(T)` 与 `insert(Collection<T>)` 两个重载，
+Mockito 里写 `ArgumentMatchers.any()` 会编译失败（歧义），必须写明 `any(ArticleVersion.class)`。
+
+### 4. 验证（真实运行）
+
+#### 4.1 提交与个人（T06）
+
+| 场景 | 实测 |
+| --- | --- |
+| 四字段缺失 | `400 reason 提交理由不能为空；referenceSource 参考来源不能为空；suggestedContent 建议内容不能为空` |
+| 未登录提交 | `401` |
+| 提交成功 | `id=4`、`status=PENDING`、返回文章标题 |
+| 我的贡献 | 只含本人提交，按时间倒序 |
+| 他人查看 | `403 只能查看自己提交的贡献` |
+| 撤回 | `WITHDRAWN`；已撤回再撤回 → `400` |
+
+#### 4.2 审核工作台
+
+| 场景 | 实测 |
+| --- | --- |
+| 创作者访问 | `403` |
+| 待审列表 | 默认只返回 `PENDING`，含提交人昵称与文章标题 |
+| 审核详情 | 同时返回文章当前正文（442 字）与建议内容，供对照 |
+
+#### 4.3 T08 审核通过（端到端，文章 8）
+
+```
+提交贡献 → PENDING
+评审员审核详情 → 原文 523 字 / 建议 37 字
+通过（带合并后的正文 596 字）
+→ 文章 version_no 1 → 2，正文 523 → 596
+→ article_version 新增 version_no=1 快照，内容 523 字（旧正文），source_contribution_id=25
+→ sys_notification 新增 REVIEW_RESULT 通知给提交者
+→ sys_operation_log 新增 CONTRIBUTION_APPROVE
+→ 提交者查看：APPROVED + 审核人 + 意见
+→ 版本历史公开可读，可追溯到来源建议 #25
+```
+
+#### 4.4 异常路径
+
+| 场景 | 实测 |
+| --- | --- |
+| 重复处理同一条建议 | `400 该建议当前状态为 已通过，不能重复处理`，且不产生第二条版本快照 |
+| T07 驳回不填意见 | `400 驳回时必须填写审核意见` |
+| T07 驳回填意见 | `REJECTED`，意见回传，提交者可见 |
+| 撤回后再审核 | 状态校验拦截 |
+| 不传 `finalContent` | 以 `suggestedContent` 作为新正文（实测文章 5 正文被替换为该建议内容） |
+
+#### 4.5 自动化测试
+
+```
+Tests run: 10  AuthAndSecurityTest
+Tests run: 13  ContributionApiTest
+Tests run: 2   ContributionTransactionTest
+Tests run: 5   ArticlePaginationTest
+Tests run: 13  KnowledgeApiTest
+Tests run: 18  WorkApiTest
+Tests run: 61, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+**`ContributionTransactionTest`（T09）** 用 `@MockitoBean` 替换 `ArticleVersionMapper`，
+强制它在写快照时抛异常，然后验证：
+
+- 文章 `version_no` 与正文**都没变**
+- 贡献仍是 `PENDING`，`reviewerId` / `reviewedAt` / `finalContent` 全为 `null`
+- 通知表与操作日志表**没有新增行**
+
+这个测试类刻意**不加** `@Transactional`——加上会把业务事务合并进测试事务，就测不到真实的提交/回滚行为了。
+测试数据在用例末尾手动清理。
+
+> 踩坑记录：`ContributionApiTest` 最初断言「同一篇文章只应生成一条历史版本」写成了固定值 1，
+> 而演示数据里文章 3 本来就有一条快照。改为「处理前后差值 +1」才稳定。
+> 期间还因为手工测试改动了演示数据，最后用重新执行 `seed.sql` 把库恢复到标准状态。
+
+#### 4.6 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0 |
+| 5 个新增/改动模块编译 | ✅ 全部 200 |
+| 走代理取版本历史 | ✅ 文章 3 返回 1 条快照，含变更说明 |
+| SSR 渲染我的贡献 | ✅ len=7151，含标题与表格 |
+| SSR 渲染知识贡献审核 | ✅ len=7551，含「核心流程」标签 |
+| SSR 渲染文章详情（含纠错入口） | ✅ len=2088 |
+
+### 5. 本阶段产出文件
+
+```
+后端新增：
+  contribution/entity/KnowledgeContribution.java
+  contribution/entity/ArticleVersion.java
+  contribution/mapper/KnowledgeContributionMapper.java
+  contribution/mapper/ArticleVersionMapper.java
+  contribution/dto/ContributionSubmitRequest.java
+  contribution/dto/ContributionReviewRequest.java
+  contribution/vo/ContributionListItemVO.java
+  contribution/vo/ContributionDetailVO.java
+  contribution/vo/ArticleVersionListItemVO.java
+  contribution/vo/ArticleVersionDetailVO.java
+  contribution/service/ContributionService.java
+  contribution/service/ContributionReviewService.java
+  contribution/service/ArticleVersionService.java
+  contribution/ContributionController.java
+  contribution/ContributionReviewController.java
+  contribution/ArticleVersionController.java
+  notification/entity/SysNotification.java
+  notification/mapper/SysNotificationMapper.java
+  notification/service/NotificationService.java
+  system/entity/SysOperationLog.java
+  system/mapper/SysOperationLogMapper.java
+  system/service/OperationLogService.java
+  src/test/java/.../ContributionApiTest.java（13 用例）
+  src/test/java/.../ContributionTransactionTest.java（2 用例，含 T09 回滚）
+
+前端新增：
+  src/api/contribution.js
+  src/views/contribution/MyContributionsView.vue
+  src/views/contribution/ReviewContributionsView.vue
+
+前端修改：
+  src/views/knowledge/ArticleDetailView.vue（纠错对话框 + 版本历史抽屉，去掉占位按钮）
+  src/router/index.js（我的贡献、贡献审核两条路由）
+  src/layouts/DefaultLayout.vue（导航加「我的贡献」「贡献审核」）
+```
+
+### 6. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 版本历史只读，暂不支持「回滚到某个版本」 | 档案列为 P1 增强项 | 可加 `POST /articles/{id}/versions/{no}/restore` |
+| 2 | 通知只有写入，没有查询与已读 | 阶段 9 | 阶段 9 做站内消息 |
+| 3 | 撤回后无法重新提交同一内容 | 需重新填一遍 | 可加「基于此建议重新提交」 |
+| 4 | 贡献列表未做文章标题模糊搜索 | 演示规模够用 | 视需要补 |
+
+### 7. 下一步建议
+
+进入**阶段 7：社区互动**：
+
+1. 评论（发表、按目标查询、删除）、点赞、收藏（含取消），全部用唯一约束防重复
+2. 内容反馈提交与后台处理
+3. 前端：文章/作品详情页的互动区、后台反馈处理页
+4. 补测试：T10 重复点赞只留一条、数据按用户隔离、目标不存在时的校验

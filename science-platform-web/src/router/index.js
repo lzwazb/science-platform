@@ -67,6 +67,18 @@ const routes = [
         meta: { title: '创作者中心', requiresAuth: true, roles: ['CREATOR', 'ADMIN', 'SUPER_ADMIN'] },
       },
       {
+        path: 'contributions/mine',
+        name: 'my-contributions',
+        component: () => import('@/views/contribution/MyContributionsView.vue'),
+        meta: { title: '我的贡献', requiresAuth: true },
+      },
+      {
+        path: 'review/contributions',
+        name: 'review-contributions',
+        component: () => import('@/views/contribution/ReviewContributionsView.vue'),
+        meta: { title: '知识贡献审核', requiresAuth: true, roles: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
+      },
+      {
         path: 'review/works',
         name: 'review-works',
         component: () => import('@/views/review/ReviewWorksView.vue'),

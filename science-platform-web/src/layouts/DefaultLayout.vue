@@ -59,11 +59,25 @@ async function handleLogout() {
           <RouterLink to="/works" class="app-nav__item">创意作品</RouterLink>
           <span class="app-nav__item app-nav__item--disabled" title="阶段 8 开放">主题活动</span>
           <RouterLink
+            v-if="userStore.isLoggedIn"
+            to="/contributions/mine"
+            class="app-nav__item"
+          >
+            我的贡献
+          </RouterLink>
+          <RouterLink
             v-if="canCreate"
             to="/creator/works"
             class="app-nav__item"
           >
             创作者中心
+          </RouterLink>
+          <RouterLink
+            v-if="userStore.canReview"
+            to="/review/contributions"
+            class="app-nav__item"
+          >
+            贡献审核
           </RouterLink>
           <RouterLink
             v-if="userStore.canReview"
@@ -115,7 +129,7 @@ async function handleLogout() {
 
     <footer class="app-footer">
       <p>本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现</p>
-      <p class="app-footer__meta">阶段 5：作品管理与知识关联</p>
+      <p class="app-footer__meta">阶段 6：知识共建与审核</p>
     </footer>
   </div>
 </template>
