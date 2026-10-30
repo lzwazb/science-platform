@@ -1651,3 +1651,121 @@ BUILD SUCCESS
 3. 补关键截图与论文素材整理（`docs/screenshots/`、`docs/thesis/`）
 4. 前端优化：Element Plus 按需引入（当前主包 878 kB）
 5. 交付说明：README 定稿、部署说明、演示脚本
+
+---
+
+## 2026-10-30 · 阶段 10：测试与收尾
+
+**目标**（开发档案第 11、12 章）：业务测试、权限测试、修复、演示数据、截图和部署说明，达成「按验收清单通过；他人可按文档运行」。
+
+### 1. 全量回归
+
+```
+后端：Tests run: 109, Failures: 0, Errors: 0  BUILD SUCCESS
+前端：npm run build  ✓ built，无报错
+```
+
+9 个测试类覆盖开发档案 12.2 的 T01–T12 全部 12 个用例：
+
+| 测试类 | 用例 | 对应验收项 |
+| --- | --- | --- |
+| `AuthAndSecurityTest` | 10 | T01 / T02 / T03 |
+| `ArticlePaginationTest` | 5 | 数据库与分页基础 |
+| `KnowledgeApiTest` | 13 | T04 |
+| `WorkApiTest` | 18 | T05 |
+| `ContributionApiTest` | 13 | T06 / T07 / T08 |
+| `ContributionTransactionTest` | 2 | **T09 事务回滚** |
+| `InteractionApiTest` | 13 | **T10** |
+| `EventApiTest` | 21 | **T11** |
+| `NotificationApiTest` | 14 | **T12** |
+
+### 2. 前端分包优化
+
+**问题**：业务主包一度达到 878 kB，Vite 每次构建都告警。
+
+**方案**：在 `vite.config.js` 里用 `manualChunks` 把第三方库拆成独立 chunk：
+
+```js
+manualChunks(id) {
+  if (id.includes('element-plus')) return 'element-plus'   // 984 kB，很少变动
+  if (id.includes('node_modules/vue') || id.includes('pinia')) return 'vue-vendor'
+  if (id.includes('node_modules')) return 'vendor'
+}
+```
+
+**效果**：
+
+| chunk | 优化前 | 优化后 |
+| --- | --- | --- |
+| 业务主包 `index.js` | 878.37 kB | **16.78 kB** |
+| `element-plus` | （合在主包里） | 984.03 kB（gzip 316.70 kB，可长期缓存） |
+| `vue-vendor` | — | 29.23 kB |
+| `vendor` | — | 57.28 kB |
+
+**为什么没做真正的按需引入**：那需要引入 `unplugin-vue-components` + `unplugin-auto-import`，
+会增加构建链复杂度，且 `ElMessage` 这类编程式调用仍需手工引样式，风险大于收益。
+分包已经解决了核心问题——**业务代码更新时用户不需要重新下载 316 kB 的 Element Plus**。
+
+### 3. 演示路径实测
+
+按开发档案第 13 章要求的完整演示路径跑了一遍（全程 HTTP 实测）：
+
+```
+【1】游客浏览文章 4（第 1 版，442 字）
+【2】user01 提交纠错 → 贡献 #68 PENDING
+【3】reviewer01 审核对照 → 原文 442 字 / 建议 51 字 / 来源已记录
+【4】审核通过 → 文章变第 2 版 496 字；快照 v1 保存 442 字旧内容；
+     通知发给用户 6；版本可追溯到来源贡献 #68
+【5】提交者在消息中心看到「知识贡献已通过」，跳转 /contributions/mine
+【6】版本历史公开可读
+【7】作品 1 关联文章 1、2（双向关联正常）
+【8】creator02 投稿活动 1 → reviewer01 评分 5.0 → 管理员确认优秀奖
+【9】权限边界：user01 → /admin 403；admin01 → /admin/users 403；superadmin → 200
+```
+
+全部通过。测试完成后重新执行 `seed.sql` 恢复标准演示数据。
+
+### 4. 文档产出
+
+| 文件 | 内容 |
+| --- | --- |
+| `docs/验收报告.md` | 对照 12.1 的 20 条逐项核对，每条给出验证命令与实测结果 |
+| `docs/答辩演示脚本.md` | 七幕演示流程、每幕要讲的话、7 个常见追问的回答要点 |
+| `docs/screenshots/README.md` | 28 张截图的清单与每张应体现的内容 |
+| `README.md` | 定稿：阶段进度、验收结论、测试总览、交付物清单、已知限制、文档索引 |
+
+### 5. 本阶段产出文件
+
+```
+新增：
+  docs/验收报告.md
+  docs/答辩演示脚本.md
+  docs/screenshots/README.md
+
+修改：
+  前端 vite.config.js（manualChunks 分包 + 阈值调整）
+  README.md（定稿）
+  application.yml（project-stage 更新为阶段 10）
+```
+
+### 6. 收尾时的遗留问题（已记入 README「已知限制」）
+
+| 编号 | 问题 | 说明 |
+| --- | --- | --- |
+| 1 | 顶栏未显示未读数红点 | `/notifications/unread-count` 接口已有，前端未接入 |
+| 2 | 评论回复、活动获奖尚未生成通知 | 通知类型已预留，可在对应 Service 补 `send` 调用 |
+| 3 | 用户管理按角色筛选在内存中进行 | 数据量大时不准，应改 SQL 子查询 |
+| 4 | 版本回滚未实现 | 档案列为 P1 增强项 |
+| 5 | 截图需人工采集 | 已提供清单与核对点 |
+
+### 7. 项目完成情况
+
+开发档案第 11 章列出的 11 个阶段（0–10）**全部完成**：
+
+- 七个核心模块全部落地并互相打通
+- 核心特色（知识贡献审核 + 版本追溯 + 作品文章关联 + 活动闭环）真实可用
+- 109 个自动化测试通过，覆盖 T01–T12
+- 验收清单 20 条全部通过
+- 文档齐备：从环境记录到答辩脚本，可直接用于论文撰写与现场演示
+
+至此项目达到「可运行、可演示、可测试、可撰写论文」的目标。
