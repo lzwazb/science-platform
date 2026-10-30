@@ -30,7 +30,8 @@ public class SecurityConfig {
             "/api/v1/health",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
-            "/api/v1/site/info",
+            // 首页平台信息与数据概览（site/info、site/stats）均对游客开放
+            "/api/v1/site/**",
             "/api/v1/announcements",
             "/error"
     };

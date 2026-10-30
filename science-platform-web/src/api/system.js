@@ -10,6 +10,13 @@ export function getSiteInfo() {
 }
 
 /**
+ * 首页数据概览：文章、作品、活动、采纳贡献、创作者人数。
+ */
+export function getSiteStats() {
+  return request.get('/site/stats')
+}
+
+/**
  * 已发布公告列表。
  */
 export function listAnnouncements(limit) {

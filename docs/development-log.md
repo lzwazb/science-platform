@@ -1903,3 +1903,131 @@ BUILD SUCCESS
 | 3 | 作品不支持批量下架 | 一次一件 |
 | 4 | 并发测试是两线程模拟 | 不是压力测试；行锁依赖 InnoDB |
 | 5 | 评论删除时不通知原作者 | 目前只在回复时通知 |
+
+---
+
+## 2026-10-30 · 首页完善
+
+**起因**：第一轮和第二轮的首页只做了「平台介绍 + 连通性检测 + 模块卡片」，
+本质是开发阶段的占位页。两个问题很明显：
+
+1. 首页最显眼的位置摆着「后端连接正常 / 数据库已连接 / 已发布文章数」——
+   这是调试信息，答辩时看起来像没清干净的脚手架
+2. 除了模块卡片，首页没有一条真实内容，访客看完不知道平台上有什么
+
+### 1. 新结构
+
+```
+① Hero      平台名称 + 简介 + 横幅 + 两个行动按钮 + 五项数据概览
+② 公告      可折叠，点击展开全文
+③ 共建流程  读 → 共建 → 审核 → 留痕（四步，讲项目的核心机制）
+④ 最新文章  6 篇，带分类、版本号、阅读量
+⑤ 最新作品  4 件，带作者与关联文章数
+⑥ 主题活动  进行中优先，已结束的排后面，带投稿数
+⑦ 模块入口  四个各自主页面
+⑧ 状态条    折叠成一行小字，只用于佐证前后端连通
+```
+
+关键变化：**连通性信息从主视觉移到页脚一行**。既保留了「能证明真实连后端」的作用，
+又不抢占首屏——答辩演示时扫一眼页脚即可，不会喧宾夺主。
+
+### 2. 新增「知识怎么被共建」区块
+
+这是本项目区别于普通内容站的地方，值得在首页讲清楚：
+
+| 步骤 | 内容 |
+| --- | --- |
+| 01 阅读 | 浏览经过人工核对的科普文章 |
+| 02 共建 | 提交补充 / 纠错建议，必须填理由与参考来源 |
+| 03 审核 | 评审员对照原文与建议处理，通过时确定最终正文 |
+| 04 留痕 | 正文更新、版本号递增、旧内容存历史版本、建议人收到通知 |
+
+最后一句动态显示「已采纳读者建议 N 条」，数字来自真实统计，不是写死的。
+
+### 3. 新增 `/api/v1/site/stats`
+
+首页需要五项数字，如果靠前端并发请求多个列表接口取 `total`，既多请求又容易口径不一致。
+所以后端出一个聚合接口：
+
+| 字段 | 口径 |
+| --- | --- |
+| articleCount | PUBLISHED 文章 |
+| workCount | PUBLISHED 作品 |
+| eventCount | **PUBLISHED + CLOSED** 活动 |
+| adoptedContributionCount | APPROVED 贡献 |
+| creatorCount | 有已发布作品的作者去重数 |
+
+### 4. 前后两次踩到同一个坑
+
+**（1）活动口径对不上**
+
+第一版 `eventCount` 只算 `PUBLISHED`，结果首页显示「主题活动 1」，
+点进 `/events` 却看到 2 个——因为已结束的活动在列表里仍然可见。
+改成 `PUBLISHED + CLOSED` 后，首页数字与实际列表条数一致（已实测比对）。
+
+**（2）`/site/stats` 一开始返回 401**
+
+`SecurityConfig` 的放行清单里写的是 `/api/v1/site/info`，加了 `/site/stats` 就漏了。
+改成 `/api/v1/site/**`，以后在 `/site` 下加接口不用再动安全规则。
+**这个 bug 是手工验证时第一眼就撞到的**，如果不先测接口直接写前端，会被误判成前端问题。
+
+### 5. 顺手加固了一条脆弱的断言
+
+跑测试时出现 4 个 `WorkApiTest` 失败，排查后确认是**演示数据被改过**：
+`seed.sql` 里作品 4 是 `PENDING`，但数据库里成了 `PUBLISHED`。
+重置 `seed.sql` 后全部通过，跑完 126 个测试后数据仍然是干净的——说明测试回滚没问题，
+是之前某次手工操作留下的状态。
+
+但这也暴露了断言的问题：`publicListOnlyPublished` 断言「已发布作品总数必须等于 3」，
+数据一变就假失败，而且报错信息看不出是数据问题。
+
+改成按 id 判断：
+
+```java
+records.forEach(node -> assertEquals("PUBLISHED", node.path("status").asText()));
+records.forEach(node -> assertTrue(node.path("id").asLong() != PENDING_WORK_ID));
+```
+
+这样既验证了「过滤生效」，又不依赖具体数据量。`editingPublishedWorkSendsBackToPending`
+里同样的 `total == PUBLISHED_WORKS - 1` 也改成了「编辑后的作品不在列表中」。
+顺手删掉了因此不再使用的 `PUBLISHED_WORKS` 常量。
+
+> 这是第三次在测试断言上栽跟头（前两次分别是硬编码点赞数、硬编码活动总数）。
+> 规律很清楚：**断言应该验证「关系」而不是「数量」**。
+
+### 6. 验证
+
+| 项 | 结果 |
+| --- | --- |
+| 后端全量测试 | `Tests run: 126, Failures: 0, Errors: 0` |
+| 前端构建 | ✓ built，HomeView 10.31 kB |
+| SSR 渲染首页 | len=5076，8 项内容检查全部命中 |
+| `/site/stats` 游客访问 | `200`，文章 8 / 作品 3 / 活动 2 / 已采纳 1 / 创作者 2 |
+| 数字与实际列表一致性 | 文章 8=8、作品 3=3、活动 2=2（逐项比对通过） |
+| 后台接口未被误放行 | `/admin/settings`、`/admin/works`、`/notifications` 均 `401` |
+| 测试后数据洁净度 | 跑完 126 个测试，作品 4 仍为 `PENDING`（回滚正常） |
+
+### 7. 本阶段产出文件
+
+```
+后端新增：
+  system/vo/SiteStatsVO.java
+  system/service/SiteStatsService.java
+
+后端修改：
+  system/SiteController.java        （加 /site/stats）
+  security/SecurityConfig.java      （/site/info → /site/**）
+
+前端重写：
+  views/public/HomeView.vue         （全新版面，8 个区块）
+
+前端修改：
+  src/api/system.js                 （加 getSiteStats）
+
+测试修改：
+  work/WorkApiTest.java             （两条断言改为按 id 判断，删除多余常量）
+
+文档：
+  docs/api-contract.md              （2.26 补 /site/stats 与统计口径）
+  docs/development-log.md           （本节）
+```

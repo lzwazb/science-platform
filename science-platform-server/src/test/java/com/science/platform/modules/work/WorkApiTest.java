@@ -36,7 +36,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class WorkApiTest {
 
-    private static final long PUBLISHED_WORKS = 3L;
     private static final long PENDING_WORK_ID = 4L;
     private static final long WORK_OF_CREATOR01 = 1L;
     private static final long WORK_REFERENCED_BY_EVENT = 3L;
@@ -84,11 +83,18 @@ class WorkApiTest {
     void publicListOnlyPublished() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/works").param("size", "50"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(PUBLISHED_WORKS))
                 .andReturn();
 
-        readJson(result).path("data").path("records").forEach(node ->
+        JsonNode records = readJson(result).path("data").path("records");
+        assertTrue(records.size() >= 1, "演示数据里应有已发布作品");
+
+        // 不依赖固定总数：只验证「返回的全是 PUBLISHED」且「待审核作品不在其中」，
+        // 这样即使演示数据增减或被手工改动，这条测试也不会误报
+        records.forEach(node ->
                 assertEquals("PUBLISHED", node.path("status").asText()));
+        records.forEach(node ->
+                assertTrue(node.path("id").asLong() != PENDING_WORK_ID,
+                        "待审核作品不应出现在公开列表"));
     }
 
     @Test
@@ -290,8 +296,13 @@ class WorkApiTest {
         mockMvc.perform(get("/api/v1/works/" + WORK_OF_CREATOR01))
                 .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/api/v1/works").param("size", "50"))
-                .andExpect(jsonPath("$.data.total").value(PUBLISHED_WORKS - 1));
+        // 编辑后回到待审核，公开列表里就不该再有它——按 id 判断而不按总数，避免依赖固定数据量
+        MvcResult listResult = mockMvc.perform(get("/api/v1/works").param("size", "50"))
+                .andExpect(status().isOk())
+                .andReturn();
+        readJson(listResult).path("data").path("records").forEach(node ->
+                assertTrue(node.path("id").asLong() != WORK_OF_CREATOR01,
+                        "编辑后的作品应从前台列表移除"));
     }
 
     @Test

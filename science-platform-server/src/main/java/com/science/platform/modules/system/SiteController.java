@@ -3,8 +3,10 @@ package com.science.platform.modules.system;
 import com.science.platform.common.ApiResponse;
 import com.science.platform.modules.system.service.AnnouncementService;
 import com.science.platform.modules.system.service.SiteConfigService;
+import com.science.platform.modules.system.service.SiteStatsService;
 import com.science.platform.modules.system.vo.AnnouncementVO;
 import com.science.platform.modules.system.vo.SiteInfoVO;
+import com.science.platform.modules.system.vo.SiteStatsVO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,11 +25,14 @@ public class SiteController {
 
     private final SiteConfigService siteConfigService;
     private final AnnouncementService announcementService;
+    private final SiteStatsService siteStatsService;
 
     public SiteController(SiteConfigService siteConfigService,
-                          AnnouncementService announcementService) {
+                          AnnouncementService announcementService,
+                          SiteStatsService siteStatsService) {
         this.siteConfigService = siteConfigService;
         this.announcementService = announcementService;
+        this.siteStatsService = siteStatsService;
     }
 
     /**
@@ -40,6 +45,14 @@ public class SiteController {
         SiteInfoVO vo = siteConfigService.loadSiteInfo();
         vo.setAnnouncements(announcementService.listPublished(HOME_ANNOUNCEMENT_LIMIT));
         return ApiResponse.success(vo);
+    }
+
+    /**
+     * 首页数据概览：文章、作品、活动、采纳贡献、创作者人数。
+     */
+    @GetMapping("/site/stats")
+    public ApiResponse<SiteStatsVO> siteStats() {
+        return ApiResponse.success(siteStatsService.stats());
     }
 
     /**

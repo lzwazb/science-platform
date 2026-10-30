@@ -770,9 +770,26 @@ GET /api/v1/users/me/overview
 | 方法 | 路径 | 认证 | 用途 |
 | --- | --- | --- | --- |
 | GET | `/api/v1/site/info` | 公开 | 首页平台信息：名称、副标题、简介、横幅、联系邮箱 + 最近 5 条已发布公告 |
+| GET | `/api/v1/site/stats` | 公开 | 首页数据概览：文章、作品、活动、采纳建议、创作者人数 |
 | GET | `/api/v1/announcements` | 公开 | 已发布公告列表，`limit` 可选 |
 
-首页只需要调 `/site/info` 一次就能拿到全部展示数据，不用再单独请求公告。
+首页只需要调 `/site/info` + `/site/stats` 两次就能拿到全部「平台级」展示数据，
+内容列表（文章 / 作品 / 活动）复用各自已有的公开接口。
+
+安全配置里用 `/api/v1/site/**` 整体放行，新增 `/site/*` 下的接口不必再改安全规则。
+
+**`/site/stats` 的统计口径**（都只算前台可见的内容）：
+
+| 字段 | 口径 |
+| --- | --- |
+| `articleCount` | `status = PUBLISHED` 的文章 |
+| `workCount` | `status = PUBLISHED` 的作品 |
+| `eventCount` | `status IN (PUBLISHED, CLOSED)` 的活动 |
+| `adoptedContributionCount` | `status = APPROVED` 的知识贡献 |
+| `creatorCount` | 有已发布作品的不同作者数 |
+
+> 活动统计特意把 `CLOSED` 算进来：已结束的活动在活动列表里仍然可见，
+> 如果只算 `PUBLISHED`，首页显示 1 个、点进去看到 2 个就对不上。
 
 配置项以键值对存储在 `sys_config`，目前使用的键：
 
