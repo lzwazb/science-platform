@@ -91,6 +91,12 @@ const routes = [
         meta: { title: '我的收藏', requiresAuth: true },
       },
       {
+        path: 'notifications',
+        name: 'notifications',
+        component: () => import('@/views/user/NotificationsView.vue'),
+        meta: { title: '站内消息', requiresAuth: true },
+      },
+      {
         path: 'review/contributions',
         name: 'review-contributions',
         component: () => import('@/views/contribution/ReviewContributionsView.vue'),
@@ -164,6 +170,12 @@ const routes = [
             name: 'admin-events',
             component: () => import('@/views/admin/AdminEventView.vue'),
             meta: { title: '活动管理' },
+          },
+          {
+            path: 'users',
+            name: 'admin-users',
+            component: () => import('@/views/admin/AdminUserView.vue'),
+            meta: { title: '用户与角色', roles: ['SUPER_ADMIN'] },
           },
         ],
       },

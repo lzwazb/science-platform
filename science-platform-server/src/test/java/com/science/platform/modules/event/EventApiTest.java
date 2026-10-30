@@ -84,19 +84,24 @@ class EventApiTest {
                 .andReturn();
 
         JsonNode events = readJson(result).path("data");
-        assertEquals(2, events.size());
+        assertTrue(events.size() >= 2, "演示数据至少含两个已发布活动");
 
+        boolean foundOngoing = false;
+        boolean foundEnded = false;
         for (JsonNode event : events) {
             long id = event.path("id").asLong();
             if (id == ONGOING_EVENT) {
                 assertEquals(EventService.TIME_ONGOING, event.path("timeStatus").asText());
                 assertTrue(event.path("acceptingSubmission").asBoolean());
+                foundOngoing = true;
             } else if (id == ENDED_EVENT) {
                 assertEquals(EventService.TIME_ENDED, event.path("timeStatus").asText(),
                         "已结束的活动应判定为 ENDED，而不是未发布");
                 assertTrue(!event.path("acceptingSubmission").asBoolean());
+                foundEnded = true;
             }
         }
+        assertTrue(foundOngoing && foundEnded, "列表应同时包含进行中与已结束的活动");
     }
 
     @Test

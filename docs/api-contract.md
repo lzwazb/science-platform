@@ -690,19 +690,91 @@ GET /api/v1/articles/{id}/versions/{versionNo}
 
 获奖作品会出现在活动详情的 `awards` 里，带 `averageScore`（评审均分），便于答辩演示时说明评审依据。
 
+### 2.23 站内消息
+
+| 方法 | 路径 | 认证 | 用途 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/notifications` | 需登录 | 我的消息分页，`onlyUnread` 控制是否只看未读 |
+| GET | `/api/v1/notifications/unread-count` | 需登录 | 未读数（顶栏小红点） |
+| PUT | `/api/v1/notifications/{id}/read` | 需登录 | 标记单条已读 |
+| PUT | `/api/v1/notifications/read-all` | 需登录 | 全部已读 |
+
+**消息隔离**（T12）：所有查询与更新都强制带 `recipient_id = 当前用户`。
+标记他人消息返回 `404 消息不存在`，且不区分「不存在」与「不属于你」，避免被用来探测他人消息 ID。
+
+**响应附带前端可直接使用的信息**：
+
+| 字段 | 说明 |
+| --- | --- |
+| `typeLabel` | 类型中文名（审核结果 / 评论回复 / 活动通知 / 系统消息） |
+| `linkPath` | 由 `relatedType + relatedId` 推出的前端路径，如 `/knowledge/3`、`/events/2` |
+| `read` | 是否已读 |
+
+`linkPath` 的映射：`ARTICLE → /knowledge/{id}`、`WORK → /works/{id}`、`EVENT → /events/{id}`、
+`CONTRIBUTION → /contributions/mine`（贡献没有独立公开详情页）。
+
+标记已读是幂等的：重复标记同样返回 `200`。
+
+### 2.24 个人中心概况
+
+```
+GET /api/v1/users/me/overview
+```
+
+需登录。一次返回各类数量，避免个人中心的五个 tab 各自请求一次：
+
+```json
+{
+  "contributionCount": 2,
+  "pendingContributionCount": 1,
+  "approvedContributionCount": 0,
+  "workCount": 0,
+  "publishedWorkCount": 0,
+  "favoriteCount": 3,
+  "submissionCount": 0,
+  "feedbackCount": 2,
+  "unreadNotificationCount": 1
+}
+```
+
+### 2.25 账号与角色管理（超级管理员）
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/admin/users` | 用户分页，支持 `keyword`（用户名/昵称）、`roleCode`、`status` |
+| PUT | `/api/v1/admin/users/{id}/roles` | 重新分配角色，body `{"roleCodes": ["USER","CREATOR"], "reason": "..."}` |
+| PUT | `/api/v1/admin/users/{id}/status` | 启用/禁用，body `{"status": "ACTIVE|DISABLED", "reason": "..."}` |
+
+路径 `/admin/users/**` 限定 `SUPER_ADMIN`；普通管理员访问返回 403（实测）。
+
+**两条防锁死规则**：
+
+| 场景 | 结果 |
+| --- | --- |
+| 移除自己的 `SUPER_ADMIN` 角色 | `400 不能移除自己的超级管理员角色` |
+| 禁用当前登录的账号 | `400 不能禁用当前登录的账号` |
+
+没有这两条，一次误操作就可能把唯一的管理员关在系统外面。
+
+**角色调整立即生效**：因为鉴权过滤器每次请求都重新查库取角色，
+所以用旧令牌的下一次请求就能拿到新权限，不需要重新登录。
+实测：给 `user01` 加上 `CREATOR` 后，用**原来那个令牌**访问 `/creator/works` 由 403 变 200。
+
+**禁用账号同样立即生效**：禁用后同一令牌访问受保护接口返回 401，恢复后又可用。
+
+角色与状态变更都会写 `sys_operation_log`（`USER_ROLE_UPDATE` / `USER_ENABLE` / `USER_DISABLE`），
+`reason` 一并入库便于追溯。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
-（阶段 3 已实现认证与个人资料 5 个接口，阶段 4 实现知识库与后台内容维护 20 个接口，
-阶段 5 实现作品公开 / 创作者 / 审核 13 个接口，阶段 6 实现知识贡献 / 审核 / 版本 8 个接口，
-阶段 7 实现互动 / 评论 / 反馈 15 个接口，阶段 8 实现活动相关 13 个接口，见 2.2–2.22。）
 
-| 模块 | 方法 | 路径 | 用途 | 计划阶段 |
-| --- | --- | --- | --- | --- |
-| 通知 | GET | `/notifications` | 查看本人消息 | 9 |
-| 通知 | PUT | `/notifications/{id}/read` | 标记本人消息已读 | 9 |
-| 后台 | GET | `/admin/users` | 超级管理员查询用户 | 9 |
-| 后台 | PUT | `/admin/users/{id}/roles` | 分配用户角色 | 9 |
+阶段 3–9 已实现认证、知识库、作品、知识共建、社区互动、主题活动、站内消息与账号管理共 **75 个接口**，
+见 2.2–2.25。开发档案第 8.3 节的接口清单已全部落地。
+
+> 与档案的路径偏离（已在各章节说明）：
+> - 创作者操作从 `/works` 改到 `/creator/works`（便于用路径规则统一授权）
+> - 活动投稿读接口 `/events/{id}/submissions/mine` 在安全配置中先于公开规则匹配
 
 ## 4. 前端调用约定
 

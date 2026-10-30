@@ -1476,3 +1476,178 @@ BUILD SUCCESS
 3. 超级管理员的账号与角色管理（`/admin/users`）
 4. 前端：`/notifications`、个人中心 tab 化、后台用户管理
 5. 补测试：T12 消息隔离（用户 A 查不到用户 B 的消息）
+
+---
+
+## 2026-10-30 · 阶段 9：个人中心与站内消息
+
+**目标**（开发档案第 11 章）：我的作品/贡献/收藏/投稿、消息列表和已读，达成「只展示当前用户数据；通知能追踪到业务事件」。
+
+### 1. 后端实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `notification/service/NotificationService` | 在阶段 6 的写入能力上补：分页、未读数、标记已读、全部已读 |
+| `notification/NotificationController` | `/notifications/**` |
+| `notification/vo/NotificationVO` | 带 `typeLabel` 与 `linkPath` 的展示对象 |
+| `user/service/UserOverviewService` | 个人中心各类数量聚合 |
+| `user/vo/UserOverviewVO` | 九个计数字段 |
+| `user/service/AdminUserService` | 用户分页、角色分配、启停账号 |
+| `user/AdminUserController` | `/admin/users/**`，仅 `SUPER_ADMIN` |
+
+### 2. 三个设计点
+
+**（1）消息隔离靠 SQL 条件，不靠「查到后再判断」**
+
+所有查询与更新都强制带 `recipient_id = 当前用户`。
+标记他人消息时 `affected == 0`，再查一次确认消息存在但不属于本人 → 返回 `404 消息不存在`
+（不返回 403，避免被用来探测他人消息 ID 是否存在）。
+
+**（2）通知直接给出前端可用的跳转路径**
+
+`NotificationVO` 里带了 `typeLabel`（类型中文名）与 `linkPath`（`/knowledge/3` 这类路径）。
+这样前端不需要维护「relatedType → 路由」的映射表，新增业务类型时只改后端一处。
+
+**（3）账号管理要有防锁死规则**
+
+两条硬约束：
+
+- 不能移除自己的 `SUPER_ADMIN` 角色
+- 不能禁用当前登录的账号
+
+没有这两条，管理员一次误操作就可能把自己关在系统外面，而且没人能进来恢复。
+
+**角色变更立即生效**这一点在本阶段又被验证了一次：因为鉴权过滤器每次请求都重新查库取角色，
+给 `user01` 加上 `CREATOR` 后，用**原来那个令牌**访问 `/creator/works` 就从 403 变成了 200。
+
+### 3. 验证（真实运行）
+
+#### 3.1 站内消息（T12）
+
+| 场景 | 实测 |
+| --- | --- |
+| user01 未读数 | `1`（一条「知识贡献未通过」） |
+| 消息列表 | 带 `typeLabel=审核结果`、`linkPath=/contributions/mine`、`read=false` |
+| **creator01 标记 user01 的消息已读** | `404 消息不存在` |
+| creator01 的消息列表 | 只有自己的 3 条，不含 user01 的 |
+| 标记已读 | `200`；重复标记仍 `200`（幂等） |
+| 标记后未读数 | `1 → 0` |
+| 全部已读 | `200`，`updated` 为受影响条数 |
+| 未登录访问 | `401` |
+
+#### 3.2 个人中心概况
+
+| 用户 | 实测 |
+| --- | --- |
+| user01 | 贡献 2（1 待审）、收藏 3、反馈 2、未读 1 |
+| creator01 | 贡献 1（已通过）、作品 2（均已发布）、投稿 2、未读 1 |
+
+#### 3.3 账号与角色管理
+
+| 场景 | 实测 |
+| --- | --- |
+| 普通管理员访问 `/admin/users` | `403` |
+| 超管用户列表 | 6 个账号，角色正确显示 |
+| 关键词 `creator` | `total=2`（creator01 / creator02） |
+| 角色筛选 `CREATOR` | 2 条 |
+| 给 user01 加 CREATOR | `200`，角色变 `USER,CREATOR` |
+| 用原令牌访问创作者中心 | `200`（角色立即生效） |
+| 角色编码不存在 | `400 角色不存在：NOT_A_ROLE` |
+| 超管移除自己的超管角色 | `400 不能移除自己的超级管理员角色` |
+| 超管禁用自己 | `400 不能禁用当前登录的账号` |
+| 禁用 user01 | `200`，旧令牌立刻 401；恢复后又可用 |
+| 操作日志 | `USER_ROLE_UPDATE` / `USER_DISABLE` / `USER_ENABLE` 均带原因 |
+
+#### 3.4 自动化测试
+
+```
+Tests run: 10  AuthAndSecurityTest
+Tests run: 13  ContributionApiTest
+Tests run: 2   ContributionTransactionTest
+Tests run: 21  EventApiTest
+Tests run: 13  InteractionApiTest
+Tests run: 5   ArticlePaginationTest
+Tests run: 13  KnowledgeApiTest
+Tests run: 14  NotificationApiTest
+Tests run: 18  WorkApiTest
+Tests run: 109, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+`NotificationApiTest` 覆盖 14 项：T12 隔离、未登录拒绝、标记已读幂等、类型标签、
+全部已读、个人概况、超管权限、角色变更即时生效、非法角色、两条防锁死规则、
+禁用后令牌失效与恢复、关键词与角色筛选、状态变更反映在列表。
+
+#### 3.5 前端
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm run build` | ✅ exit 0 |
+| 6 个新增/改动模块编译 | ✅ 全部 200 |
+| 走代理取未读数 / 概况 | ✅ `unreadCount=1`，概况字段齐全 |
+| SSR 渲染消息中心 | ✅ len=5670，含「全部已读」 |
+| SSR 渲染个人中心 | ✅ len=20451，7 个 tab |
+| SSR 渲染后台用户管理 | ✅ len=8625，含表格 |
+
+### 4. 发现并清理的一处环境问题
+
+阶段 8 结束、阶段 9 开始时，发现数据库中多了一条名为「活动测试」的活动（id=9）、
+一条评语为「1」的评审记录，以及 6 条额外的操作日志——这些不是 seed 数据，也不是本阶段测试产生的。
+
+判断是之前手工验证（或在界面上试用）留下的残留。为保证演示数据干净一致，
+本阶段重新执行了 `seed.sql` 恢复标准状态（2 个活动 / 3 条投稿 / 2 条评审 / 7 条通知 / 6 条日志）。
+
+同时把 `EventApiTest.listShowsTimeStatus` 里「活动总数必须等于 2」的断言改成了
+「至少包含进行中与已结束各一个」，避免以后演示数据变动导致测试误报失败。
+
+### 5. 本阶段产出文件
+
+```
+后端新增：
+  notification/vo/NotificationVO.java
+  notification/NotificationController.java
+  user/vo/UserOverviewVO.java
+  user/service/UserOverviewService.java
+  user/dto/UserRoleUpdateRequest.java
+  user/dto/UserStatusUpdateRequest.java
+  user/vo/AdminUserListItemVO.java
+  user/service/AdminUserService.java
+  user/AdminUserController.java
+  src/test/java/.../NotificationApiTest.java（14 用例）
+
+后端修改：
+  notification/service/NotificationService.java（补查询、已读、跳转路径）
+
+前端新增：
+  src/api/notification.js
+  src/api/adminUser.js
+  src/views/user/NotificationsView.vue
+  src/views/admin/AdminUserView.vue
+
+前端重写：
+  src/views/user/ProfileView.vue（改为 7 个 tab：概况 / 作品 / 贡献 / 收藏 / 投稿 / 反馈 / 编辑资料）
+
+前端修改：
+  src/router/index.js（消息中心、后台用户管理两条路由）
+  src/layouts/DefaultLayout.vue（导航加「消息」）
+  src/layouts/AdminLayout.vue（后台菜单加「用户与角色」）
+```
+
+### 6. 遗留问题
+
+| 编号 | 问题 | 影响 | 处理计划 |
+| --- | --- | --- | --- |
+| 1 | 顶栏未显示未读数红点 | 需手动进消息页查看 | 阶段 10 可补（已有 unread-count 接口） |
+| 2 | 个人中心各 tab 只取前 20 条 | 演示够用 | 可加各自分页 |
+| 3 | 评论回复、活动获奖尚未生成通知 | 通知类型已预留 | 可在对应 Service 补 send 调用 |
+| 4 | 用户管理按角色筛选在内存中进行 | 数据量大时不准 | 应改为 SQL 子查询，演示规模无影响 |
+
+### 7. 下一步建议
+
+进入**阶段 10：测试与收尾**：
+
+1. 全量回归：跑完整测试套件、两端构建、按 12.1 验收清单逐条核对
+2. 演示数据核验：确认 seed 覆盖答辩演示的完整路径
+3. 补关键截图与论文素材整理（`docs/screenshots/`、`docs/thesis/`）
+4. 前端优化：Element Plus 按需引入（当前主包 878 kB）
+5. 交付说明：README 定稿、部署说明、演示脚本
