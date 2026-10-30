@@ -28,6 +28,10 @@ public class HealthController {
     @Value("${spring.application.name:science-platform-server}")
     private String applicationName;
 
+    /** 当前开发阶段，来自配置，避免每个阶段都要改代码 */
+    @Value("${app.project-stage:开发中}")
+    private String projectStage;
+
     public HealthController(SystemHealthService systemHealthService) {
         this.systemHealthService = systemHealthService;
     }
@@ -38,7 +42,7 @@ public class HealthController {
         data.put("status", "UP");
         data.put("application", applicationName);
         data.put("project", "基于 Spring Boot + Vue 的科普知识共创与创意传播平台");
-        data.put("stage", "阶段 2：数据库与基础规范");
+        data.put("stage", projectStage);
         data.put("serverTime", LocalDateTime.now().format(TIME_FORMAT));
 
         // 真实访问数据库，失败时由全局异常处理器返回 500，避免「服务在跑但数据库断开」被误报为健康
