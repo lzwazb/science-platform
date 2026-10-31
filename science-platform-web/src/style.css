@@ -409,21 +409,38 @@ h4 {
 
    用 :focus-visible 而不是 :focus——鼠标点击不会触发，只有键盘导航才显示，
    避免点击后留下一圈持久描边。
+
+   注意：这里只列明确的交互元素（链接、按钮），**不要用 [tabindex] 通配**。
+   Element Plus 会给输入框、下拉菜单项、抽屉内部元素都挂 tabindex，
+   通配写法会给搜索框套上一圈粗描边，既难看又与外层分组的边框叠成双层。
    ========================================================================== */
 
 a:focus-visible,
 button:focus-visible,
-[tabindex]:focus-visible {
+.el-button:focus-visible {
   outline: 2px solid var(--sp-primary);
   outline-offset: 2px;
   border-radius: var(--sp-radius-sm);
 }
 
-/* Element Plus 的卡片/标签类可点元素同样处理 */
-.el-tag:focus-visible,
-.el-button:focus-visible {
-  outline: 2px solid var(--sp-primary);
-  outline-offset: 2px;
+/* ==========================================================================
+   输入框聚焦态
+   --------------------------------------------------------------------------
+   Element Plus 默认在聚焦时给 .el-input__wrapper 套一圈品牌色描边。
+   单看没问题，但带「附加按钮」的搜索框（输入框 + 搜索按钮组成一组）里，
+   这圈描边会和分组边框叠成双框，很突兀。
+
+   这里改成中性灰加深：既满足「不要高亮描边」的观感，
+   又保留一点焦点提示——完全去掉的话，键盘用户会看不出光标在哪个输入框。
+   ========================================================================== */
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--sp-border-strong) inset;
+}
+
+/* 多行文本框同理 */
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--sp-border-strong) inset;
 }
 
 /* ==========================================================================
