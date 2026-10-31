@@ -147,8 +147,8 @@ async function handleSubmit() {
   justify-content: center;
   padding: 40px 20px;
   background:
-    radial-gradient(circle at 18% 22%, rgba(64, 158, 255, 0.16), transparent 42%),
-    radial-gradient(circle at 82% 78%, rgba(64, 158, 255, 0.12), transparent 46%);
+    radial-gradient(circle at 18% 22%, var(--sp-primary-a16), transparent 42%),
+    radial-gradient(circle at 82% 78%, var(--sp-primary-a12), transparent 46%);
 }
 
 .auth-card {

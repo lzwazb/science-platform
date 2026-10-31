@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -7,45 +7,92 @@ const route = useRoute()
 const userStore = useUserStore()
 
 /**
- * 后台布局：左侧菜单 + 右侧内容。
+ * 后台布局：左侧分组菜单 + 右侧内容。
  *
+ * 菜单按业务域分组，避免十几项平铺造成扫读负担；
  * 菜单项按角色过滤只是体验优化，真正的权限边界在后端接口。
  */
-const menuItems = computed(() => {
-  const items = [
-    { path: '/admin/articles', label: '文章管理', role: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/admin/categories', label: '分类管理', role: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/admin/topics', label: '专题管理', role: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/admin/works', label: '作品管理', role: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/admin/events', label: '活动管理', role: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/admin/feedback', label: '内容反馈', role: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/admin/users', label: '用户与角色', role: ['SUPER_ADMIN'] },
-    { path: '/admin/settings', label: '系统设置', role: ['SUPER_ADMIN'] },
+const menuGroups = computed(() => {
+  const groups = [
+    {
+      label: '内容',
+      items: [
+        { path: '/admin/articles', label: '文章管理', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/categories', label: '分类管理', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/topics', label: '专题管理', role: ['ADMIN', 'SUPER_ADMIN'] },
+      ],
+    },
+    {
+      label: '运营',
+      items: [
+        { path: '/admin/works', label: '作品管理', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/events', label: '活动管理', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/feedback', label: '内容反馈', role: ['ADMIN', 'SUPER_ADMIN'] },
+      ],
+    },
+    {
+      label: '系统',
+      items: [
+        { path: '/admin/users', label: '用户与角色', role: ['SUPER_ADMIN'] },
+        { path: '/admin/settings', label: '系统设置', role: ['SUPER_ADMIN'] },
+      ],
+    },
   ]
-  return items.filter((item) => userStore.hasAnyRole(item.role))
+
+  // 空组直接丢弃，避免出现只有标题没有菜单项的分组
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => userStore.hasAnyRole(item.role)),
+    }))
+    .filter((group) => group.items.length > 0)
 })
 
 const activePath = computed(() => route.path)
+
+/** 窄屏下的菜单折叠 */
+const sideOpen = ref(false)
+
+watch(
+  () => route.path,
+  () => {
+    sideOpen.value = false
+  },
+)
 </script>
 
 <template>
   <div class="admin-shell">
-    <aside class="admin-side">
+    <!-- 窄屏切换按钮 -->
+    <button
+      type="button"
+      class="admin-toggle"
+      :aria-expanded="sideOpen"
+      @click="sideOpen = !sideOpen"
+    >
+      <span class="admin-toggle__bars"><i /><i /><i /></span>
+      后台菜单
+    </button>
+
+    <aside class="admin-side" :class="{ 'admin-side--open': sideOpen }">
       <div class="admin-side__head">
-        <span class="admin-side__title">内容管理</span>
-        <el-tag size="small" effect="plain" type="warning">后台</el-tag>
+        <span class="admin-side__title">后台管理</span>
+        <el-tag size="small" effect="plain" type="warning">{{ userStore.isSuperAdmin ? '超管' : '管理' }}</el-tag>
       </div>
 
       <nav class="admin-side__nav">
-        <RouterLink
-          v-for="item in menuItems"
-          :key="item.path"
-          :to="item.path"
-          class="admin-side__item"
-          :class="{ 'admin-side__item--active': activePath === item.path }"
-        >
-          {{ item.label }}
-        </RouterLink>
+        <div v-for="group in menuGroups" :key="group.label" class="admin-side__group">
+          <p class="admin-side__label">{{ group.label }}</p>
+          <RouterLink
+            v-for="item in group.items"
+            :key="item.path"
+            :to="item.path"
+            class="admin-side__item"
+            :class="{ 'admin-side__item--active': activePath === item.path }"
+          >
+            {{ item.label }}
+          </RouterLink>
+        </div>
       </nav>
 
       <p class="admin-side__note">
@@ -62,21 +109,55 @@ const activePath = computed(() => route.path)
 <style scoped>
 .admin-shell {
   display: grid;
-  grid-template-columns: 208px 1fr;
-  gap: 20px;
-  max-width: 1280px;
+  grid-template-columns: 196px 1fr;
+  gap: var(--sp-gap-lg);
+  width: 100%;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
   align-items: start;
 }
 
+/* 窄屏切换按钮：桌面端隐藏 */
+.admin-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: var(--sp-gap-sm);
+  padding: 10px 14px;
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius-sm);
+  background: #fff;
+  font-size: 13px;
+  color: var(--sp-text);
+  cursor: pointer;
+}
+
+.admin-toggle__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.admin-toggle__bars i {
+  display: block;
+  width: 13px;
+  height: 1.5px;
+  background: var(--sp-text);
+  border-radius: 1px;
+}
+
+/* ---------- 侧边栏 ---------- */
+
 .admin-side {
   position: sticky;
-  top: 88px;
-  padding: 18px 14px;
+  top: calc(var(--sp-header-height) + 16px);
+  padding: 16px 12px;
   border: 1px solid var(--sp-border);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-sm);
 }
 
 .admin-side__head {
@@ -90,7 +171,7 @@ const activePath = computed(() => route.path)
 }
 
 .admin-side__title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--sp-text-strong);
 }
@@ -98,17 +179,27 @@ const activePath = computed(() => route.path)
 .admin-side__nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 14px;
+}
+
+.admin-side__label {
+  margin: 0 0 4px;
+  padding-left: 12px;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  color: var(--sp-text-faint);
 }
 
 .admin-side__item {
   display: block;
-  padding: 9px 12px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: var(--sp-radius-sm);
+  font-size: 13px;
   color: var(--sp-text);
   text-decoration: none;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition:
+    background var(--sp-transition),
+    color var(--sp-transition);
 }
 
 .admin-side__item:hover {
@@ -120,16 +211,6 @@ const activePath = computed(() => route.path)
   background: var(--sp-primary-soft);
   color: var(--sp-primary-dark);
   font-weight: 600;
-}
-
-.admin-side__item--disabled {
-  color: var(--sp-text-faint);
-  cursor: not-allowed;
-}
-
-.admin-side__item--disabled:hover {
-  background: transparent;
-  color: var(--sp-text-faint);
 }
 
 .admin-side__note {
@@ -145,18 +226,46 @@ const activePath = computed(() => route.path)
   min-width: 0;
 }
 
+/* ==========================================================================
+   响应式
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .admin-shell {
+    grid-template-columns: 176px 1fr;
+    gap: var(--sp-gap);
+    padding: var(--sp-gap) 18px var(--sp-gap-xl);
+  }
+}
+
 @media (max-width: 900px) {
   .admin-shell {
     grid-template-columns: 1fr;
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
   }
 
+  .admin-toggle {
+    display: flex;
+  }
+
+  /* 窄屏收起为折叠面板，避免菜单占满首屏 */
   .admin-side {
+    display: none;
     position: static;
+  }
+
+  .admin-side--open {
+    display: block;
   }
 
   .admin-side__nav {
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .admin-side__group {
+    flex: 1 1 140px;
   }
 }
 </style>

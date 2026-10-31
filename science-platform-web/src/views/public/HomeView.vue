@@ -397,7 +397,7 @@ onMounted(() => {
   border-radius: 18px;
   border: 1px solid var(--sp-border);
   background:
-    radial-gradient(circle at 88% 14%, rgba(64, 158, 255, 0.16), transparent 48%),
+    radial-gradient(circle at 88% 14%, var(--sp-primary-a16), transparent 48%),
     linear-gradient(135deg, #f5faff 0%, #ffffff 66%);
 }
 
@@ -435,7 +435,7 @@ onMounted(() => {
   margin: 0 0 18px;
   padding: 6px 14px;
   border-radius: 20px;
-  background: rgba(64, 158, 255, 0.12);
+  background: var(--sp-primary-a12);
   font-size: 13px;
   color: var(--sp-primary-dark);
 }
@@ -678,8 +678,8 @@ onMounted(() => {
 }
 
 .article-card:hover {
-  border-color: rgba(64, 158, 255, 0.5);
-  box-shadow: 0 8px 22px rgba(64, 158, 255, 0.1);
+  border-color: var(--sp-primary-a50);
+  box-shadow: 0 8px 22px var(--sp-primary-a10);
   transform: translateY(-2px);
 }
 
@@ -713,7 +713,7 @@ onMounted(() => {
   right: 10px;
   padding: 2px 9px;
   border-radius: 10px;
-  background: rgba(64, 158, 255, 0.92);
+  background: var(--sp-primary-a92);
   color: #fff;
   font-size: 11px;
 }
@@ -779,8 +779,8 @@ onMounted(() => {
 }
 
 .work-card:hover {
-  border-color: rgba(64, 158, 255, 0.5);
-  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.1);
+  border-color: var(--sp-primary-a50);
+  box-shadow: 0 8px 20px var(--sp-primary-a10);
 }
 
 .work-card__cover {
@@ -834,8 +834,8 @@ onMounted(() => {
 }
 
 .event-card:hover {
-  border-color: rgba(64, 158, 255, 0.5);
-  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.1);
+  border-color: var(--sp-primary-a50);
+  box-shadow: 0 8px 20px var(--sp-primary-a10);
 }
 
 .event-card__main {
@@ -919,8 +919,8 @@ onMounted(() => {
 }
 
 .module-card:hover {
-  border-color: rgba(64, 158, 255, 0.45);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.1);
+  border-color: var(--sp-primary-a45);
+  box-shadow: 0 6px 16px var(--sp-primary-a10);
 }
 
 .module-card h3 {

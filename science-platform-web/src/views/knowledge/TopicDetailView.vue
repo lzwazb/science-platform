@@ -161,8 +161,8 @@ onMounted(fetchDetail)
 }
 
 .topic-articles__link:hover {
-  border-color: rgba(64, 158, 255, 0.5);
-  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.1);
+  border-color: var(--sp-primary-a50);
+  box-shadow: 0 8px 20px var(--sp-primary-a10);
 }
 
 .topic-articles__index {

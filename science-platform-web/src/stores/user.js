@@ -44,6 +44,9 @@ export const useUserStore = defineStore('user', () => {
   /** 是否拥有管理类角色（管理员或超级管理员） */
   const isAdmin = computed(() => hasAnyRole(['ADMIN', 'SUPER_ADMIN']))
 
+  /** 是否为超级管理员（系统设置、账号管理专属） */
+  const isSuperAdmin = computed(() => hasRole('SUPER_ADMIN'))
+
   /** 是否具备评审权限（评审员、管理员、超级管理员均可审核） */
   const canReview = computed(() => hasAnyRole(['REVIEWER', 'ADMIN', 'SUPER_ADMIN']))
 
@@ -110,6 +113,7 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     roles,
     isAdmin,
+    isSuperAdmin,
     canReview,
     hasRole,
     hasAnyRole,

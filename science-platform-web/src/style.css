@@ -1,19 +1,87 @@
-/* ---------- 全局基础样式与主题变量（蓝白科技风，开发档案 9.1） ---------- */
+/* ==========================================================================
+   全局设计变量与基础样式
+   --------------------------------------------------------------------------
+   本文件是所有页面共用的"设计底座"：
+   颜色、圆角、间距、容器宽度、阴影都在这里定义一次，
+   页面里只引用变量，不重复写死具体值。
+
+   改主题时只需改这一处，全站自动跟随。
+   ========================================================================== */
+
 :root {
-  --sp-primary: #409eff;
-  --sp-primary-dark: #2a7bd6;
-  --sp-primary-soft: #ecf5ff;
-  --sp-text-strong: #1f2733;
-  --sp-text: #3f4a58;
-  --sp-text-muted: #6b7684;
-  --sp-text-faint: #a3adb9;
-  --sp-border: #e4ecf5;
-  --sp-bg: #f6f9fd;
+  /* ---------- 品牌色 ---------- */
+  --sp-primary: #347fd1;
+  --sp-primary-dark: #2a66a7;
+  --sp-primary-light: #5b9adf;
+  --sp-primary-soft: #edf3fb;
+  --sp-primary-softer: #f6f9fd;
+
+  /* 品牌色的透明档位：用于悬停边框、柔光阴影、渐变背景。
+     统一在这里定义，避免各页面自己写死 rgba 数值，
+     换主题色时不用再逐页去改。 */
+  --sp-primary-a08: rgba(52, 127, 209, 0.08);
+  --sp-primary-a10: rgba(52, 127, 209, 0.1);
+  --sp-primary-a12: rgba(52, 127, 209, 0.12);
+  --sp-primary-a15: rgba(52, 127, 209, 0.15);
+  --sp-primary-a16: rgba(52, 127, 209, 0.16);
+  --sp-primary-a22: rgba(52, 127, 209, 0.22);
+  --sp-primary-a40: rgba(52, 127, 209, 0.4);
+  --sp-primary-a45: rgba(52, 127, 209, 0.45);
+  --sp-primary-a50: rgba(52, 127, 209, 0.5);
+  --sp-primary-a92: rgba(52, 127, 209, 0.92);
+
+  /* ---------- 文字层级 ---------- */
+  --sp-text-strong: #25364a;
+  --sp-text: #3d4d61;
+  --sp-text-muted: #67768a;
+  --sp-text-faint: #9aa7b8;
+
+  /* ---------- 边框与背景 ---------- */
+  --sp-border: #e3ebf5;
+  --sp-border-strong: #d3deeb;
+  --sp-bg: #f5f8fc;
+  --sp-surface: #ffffff;
+
+  /* ---------- 圆角 ---------- */
+  --sp-radius-sm: 8px;
+  --sp-radius: 12px;
+  --sp-radius-lg: 16px;
+
+  /* ---------- 间距 ---------- */
+  --sp-gap-xs: 8px;
+  --sp-gap-sm: 12px;
+  --sp-gap: 16px;
+  --sp-gap-lg: 24px;
+  --sp-gap-xl: 36px;
+
+  /* ---------- 容器与布局 ---------- */
+  --sp-container: 1200px;
+  --sp-header-height: 64px;
+
+  /* ---------- 阴影（轻边框 + 弱阴影，避免重投影） ---------- */
+  --sp-shadow-sm: 0 1px 3px rgba(37, 54, 74, 0.06);
+  --sp-shadow: 0 4px 16px rgba(37, 54, 74, 0.08);
+  --sp-shadow-lg: 0 10px 28px rgba(52, 127, 209, 0.14);
+
+  /* ---------- 过渡 ---------- */
+  --sp-transition: 0.18s ease;
+
+  /* ---------- Element Plus 主色对齐项目品牌色 ----------
+     Element Plus 的深浅变体是编译期算出来的，
+     这里按 #347fd1 与白/黑混合手动补齐，保证按钮、链接、选中态色调一致。 */
+  --el-color-primary: #347fd1;
+  --el-color-primary-light-3: #71a5df;
+  --el-color-primary-light-5: #99bfe8;
+  --el-color-primary-light-7: #c2d9f1;
+  --el-color-primary-light-8: #d6e5f6;
+  --el-color-primary-light-9: #ebf2fb;
+  --el-color-primary-dark-2: #2a66a7;
 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
   color: var(--sp-text);
   background-color: var(--sp-bg);
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -43,8 +111,11 @@ a {
 
 h1,
 h2,
-h3 {
+h3,
+h4 {
   font-weight: 600;
+  color: var(--sp-text-strong);
+  line-height: 1.4;
 }
 
 /* 统一滚动条样式，避免演示时出现突兀的默认滚动条 */
@@ -60,4 +131,187 @@ h3 {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #b3c4d6;
+}
+
+/* ==========================================================================
+   公共布局类
+   --------------------------------------------------------------------------
+   页面只需套上 sp-page / sp-page-head / sp-card 就能获得统一外观，
+   不必每页重复定义 padding、圆角、间距。
+   ========================================================================== */
+
+/* 内容容器：居中、限制最大宽度、保留左右内边距 */
+.sp-page {
+  width: 100%;
+  max-width: var(--sp-container);
+  margin: 0 auto;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
+}
+
+/* 窄容器：用于详情页正文等需要控制阅读宽度的场景 */
+.sp-page--narrow {
+  max-width: 960px;
+}
+
+/* 页面头部：标题 + 说明在左，操作按钮在右 */
+.sp-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-gap);
+  margin-bottom: var(--sp-gap-lg);
+}
+
+.sp-page-head__text {
+  min-width: 0;
+}
+
+.sp-page-head h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.sp-page-head p {
+  margin: 0;
+  max-width: 760px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--sp-text-muted);
+}
+
+.sp-page-head__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--sp-gap-xs);
+}
+
+/* 区块标题：页面内的二级区块 */
+.sp-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-gap);
+  margin-bottom: var(--sp-gap);
+}
+
+.sp-section-head h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.sp-section-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sp-text-muted);
+}
+
+/* 卡片：白色底、轻边框、统一圆角 */
+.sp-card {
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-sm);
+}
+
+/* 筛选工具栏 */
+.sp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-gap-xs);
+  margin-bottom: var(--sp-gap);
+}
+
+.sp-toolbar__spacer {
+  margin-left: auto;
+}
+
+/* 分页区域 */
+.sp-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-gap-lg);
+}
+
+/* 全站统一的交互过渡 */
+.sp-interactive {
+  transition:
+    border-color var(--sp-transition),
+    box-shadow var(--sp-transition),
+    transform var(--sp-transition);
+}
+
+/* ==========================================================================
+   响应式
+   ========================================================================== */
+
+/* 平板横屏 / 小笔记本 */
+@media (max-width: 1024px) {
+  .sp-page {
+    padding: var(--sp-gap) 18px var(--sp-gap-xl);
+  }
+}
+
+/* 手机 */
+@media (max-width: 768px) {
+  .sp-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+
+  .sp-page-head {
+    flex-direction: column;
+    margin-bottom: var(--sp-gap);
+  }
+
+  .sp-page-head h1 {
+    font-size: 19px;
+  }
+
+  .sp-page-head__actions {
+    width: 100%;
+  }
+
+  .sp-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-gap-xs);
+  }
+
+  .sp-toolbar {
+    gap: 6px;
+  }
+
+  .sp-toolbar > * {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .sp-pagination {
+    justify-content: center;
+    overflow-x: auto;
+  }
+}
+
+/* 超窄屏 */
+@media (max-width: 375px) {
+  .sp-page {
+    padding: 12px 12px var(--sp-gap-lg);
+  }
+}
+
+/* ==========================================================================
+   无障碍：尊重「减少动态效果」的系统偏好
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

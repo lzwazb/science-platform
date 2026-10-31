@@ -156,8 +156,8 @@ onMounted(fetchFavorites)
 }
 
 .favorite-card:hover {
-  border-color: rgba(64, 158, 255, 0.5);
-  box-shadow: 0 10px 24px rgba(64, 158, 255, 0.12);
+  border-color: var(--sp-primary-a50);
+  box-shadow: 0 10px 24px var(--sp-primary-a12);
   transform: translateY(-2px);
 }
 

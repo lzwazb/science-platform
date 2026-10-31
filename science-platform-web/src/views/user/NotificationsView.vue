@@ -230,12 +230,12 @@ onMounted(fetchRows)
 }
 
 .notify-item--unread {
-  border-color: rgba(64, 158, 255, 0.4);
+  border-color: var(--sp-primary-a40);
   background: #f8fbff;
 }
 
 .notify-item:hover {
-  box-shadow: 0 6px 18px rgba(64, 158, 255, 0.08);
+  box-shadow: 0 6px 18px var(--sp-primary-a08);
 }
 
 .notify-item__dot {

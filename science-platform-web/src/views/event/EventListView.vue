@@ -98,7 +98,7 @@ onMounted(fetchEvents)
   border-radius: 16px;
   border: 1px solid var(--sp-border);
   background:
-    radial-gradient(circle at 84% 20%, rgba(64, 158, 255, 0.16), transparent 46%),
+    radial-gradient(circle at 84% 20%, var(--sp-primary-a16), transparent 46%),
     linear-gradient(135deg, #f4f9ff 0%, #ffffff 64%);
 }
 
@@ -134,8 +134,8 @@ onMounted(fetchEvents)
 }
 
 .event-card:hover {
-  border-color: rgba(64, 158, 255, 0.5);
-  box-shadow: 0 10px 24px rgba(64, 158, 255, 0.12);
+  border-color: var(--sp-primary-a50);
+  box-shadow: 0 10px 24px var(--sp-primary-a12);
   transform: translateY(-2px);
 }
 
