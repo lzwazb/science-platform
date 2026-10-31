@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { getHealth } from '@/api/health'
-import { getSiteInfo, getSiteStats } from '@/api/system'
+import { getSiteStats } from '@/api/system'
+import { useSiteStore } from '@/stores/site'
 import { listArticles } from '@/api/article'
 import { listWorks } from '@/api/work'
 import { listEvents } from '@/api/event'
@@ -16,20 +17,19 @@ import { TIME_STATUS } from '@/constants/dict'
 
 // ---------------- 平台信息 ----------------
 
-const siteInfo = ref(null)
+// 平台信息统一由 site store 提供：顶栏品牌、页脚、首页 hero 共用同一份数据与兜底文案，
+// 也避免同一页面重复请求 /site/info
+const siteStore = useSiteStore()
 const stats = ref(null)
 
-/** 后台未配置或接口异常时的兜底文案，保证首页永远能打开 */
-const FALLBACK_SITE = {
-  name: '科普知识共创与创意传播平台',
-  subtitle: 'Knowledge Co-creation & Creative Communication',
-  description:
-    '让科普知识在阅读、共创、创作与传播之间流动起来：用户既阅读经过核对的科普文章，也能提交补充与纠错建议，创作与文章相关的创意作品，并参与主题活动。',
-  banner: '发现不准确？提交纠错，让知识更靠谱',
-  announcements: [],
-}
-
-const site = computed(() => siteInfo.value || FALLBACK_SITE)
+const site = computed(() => ({
+  name: siteStore.name,
+  subtitle: siteStore.subtitle,
+  description: siteStore.description,
+  banner: siteStore.banner,
+  contact: siteStore.contact,
+  announcements: siteStore.announcements,
+}))
 
 // ---------------- 内容区 ----------------
 
@@ -52,14 +52,6 @@ const health = ref(null)
 const healthError = ref('')
 
 // ---------------- 数据加载 ----------------
-
-async function loadSite() {
-  try {
-    siteInfo.value = await getSiteInfo()
-  } catch {
-    siteInfo.value = null
-  }
-}
 
 async function loadStats() {
   try {
@@ -142,7 +134,6 @@ function formatDate(value) {
 }
 
 onMounted(() => {
-  loadSite()
   loadStats()
   loadContent()
   loadHealth()

@@ -12,6 +12,9 @@ import {
   updateAnnouncement,
   updateSiteSettings,
 } from '@/api/system'
+import { useSiteStore } from '@/stores/site'
+
+const siteStore = useSiteStore()
 
 const activeTab = ref('site')
 
@@ -72,6 +75,8 @@ async function handleSave() {
       banner: form.banner.trim(),
       contact: form.contact.trim(),
     })
+    // 保存后强制重拉，顶栏品牌、页脚、首页 hero 与浏览器标题随之更新
+    await siteStore.fetchSiteInfo(true)
     ElMessage.success('平台设置已保存，前台立即生效')
   } catch {
     // 错误已提示

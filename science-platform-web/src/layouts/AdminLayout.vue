@@ -101,6 +101,11 @@ watch(
     </aside>
 
     <section class="admin-main">
+      <!-- 面包屑：窄屏侧栏收起后，这里仍能说明「当前在哪个页面」 -->
+      <el-breadcrumb separator="/" class="admin-crumb">
+        <el-breadcrumb-item :to="{ path: '/admin/articles' }">后台管理</el-breadcrumb-item>
+        <el-breadcrumb-item v-if="route.meta?.title">{{ route.meta.title }}</el-breadcrumb-item>
+      </el-breadcrumb>
       <RouterView />
     </section>
   </div>
@@ -224,6 +229,11 @@ watch(
 
 .admin-main {
   min-width: 0;
+}
+
+.admin-crumb {
+  margin-bottom: var(--sp-gap);
+  font-size: 12px;
 }
 
 /* ==========================================================================

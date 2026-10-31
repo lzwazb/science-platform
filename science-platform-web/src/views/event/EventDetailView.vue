@@ -237,7 +237,7 @@ onMounted(fetchDetail)
 
 <style scoped>
 .event-detail {
-  max-width: 960px;
+  max-width: var(--sp-container-reading);
   margin: 0 auto;
   padding: 24px 24px 56px;
 }

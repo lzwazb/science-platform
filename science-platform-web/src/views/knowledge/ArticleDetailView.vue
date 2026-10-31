@@ -339,7 +339,7 @@ onMounted(fetchDetail)
 
 <style scoped>
 .article-page {
-  max-width: 860px;
+  max-width: var(--sp-container-reading);
   margin: 0 auto;
   padding: 24px 24px 56px;
 }

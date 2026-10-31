@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { getUnreadCount } from '@/api/notification'
+import { useSiteStore } from '@/stores/site'
 import {
   PRIMARY_NAV,
   ROLE_LABELS,
@@ -15,9 +16,25 @@ import {
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const siteStore = useSiteStore()
 
 /** 主导航（公共入口） */
 const primaryNav = PRIMARY_NAV
+
+/**
+ * 判断某个导航项是否属于当前路径。
+ *
+ * <p>不用 RouterLink 自带的 router-link-exact-active / router-link-active：</p>
+ * <ul>
+ *   <li>exact 版在 /knowledge/3 这类详情页不命中，用户失去位置感；</li>
+ *   <li>非 exact 版会让「首页」（路径 /）在所有页面都高亮，因为它是所有路径的前缀。</li>
+ * </ul>
+ * <p>所以这里显式判断，并对根路径单独处理。</p>
+ */
+function isActive(path) {
+  if (path === '/') return route.path === '/'
+  return route.path === path || route.path.startsWith(path + '/')
+}
 
 /** 取最高权限角色用于顶栏展示 */
 const primaryRoleLabel = computed(() =>
@@ -56,6 +73,18 @@ async function refreshUnread() {
 /** 路由变化时刷新未读数（读完消息返回就能看到数字减少） */
 watch(() => route.fullPath, refreshUnread)
 
+/**
+ * 平台名称是异步加载的，而 router 的 afterEach 在导航时就会写 document.title，
+ * 那一刻 store 可能还没数据，标签页会停在默认名。
+ * 这里在名称到位后补一次，保证首次进站时标题也是对的。
+ */
+watch(
+  () => siteStore.name,
+  (name) => {
+    document.title = route.meta?.title ? `${route.meta.title} - ${name}` : name
+  },
+)
+
 watch(drawerVisible, (open) => {
   // 抽屉打开时锁滚动，关闭时恢复
   document.body.style.overflow = open ? 'hidden' : ''
@@ -82,7 +111,11 @@ async function handleLogout() {
   router.push('/')
 }
 
-onMounted(refreshUnread)
+onMounted(() => {
+  refreshUnread()
+  // 平台名称等信息只需拉一次，供顶栏品牌与页脚使用
+  siteStore.fetchSiteInfo()
+})
 </script>
 
 <template>
@@ -93,7 +126,7 @@ onMounted(refreshUnread)
         <RouterLink to="/" class="brand">
           <span class="brand__mark">科</span>
           <span class="brand__text">
-            <strong>科普知识共创平台</strong>
+            <strong :title="siteStore.name">{{ siteStore.name }}</strong>
             <small>Knowledge Co-creation</small>
           </span>
         </RouterLink>
@@ -105,6 +138,7 @@ onMounted(refreshUnread)
             :key="item.to"
             :to="item.to"
             class="app-nav__item"
+            :class="{ 'app-nav__item--active': isActive(item.to) }"
           >
             {{ item.label }}
           </RouterLink>
@@ -201,14 +235,14 @@ onMounted(refreshUnread)
     </main>
 
     <footer class="app-footer">
-      <p>本科毕业设计 · 基于 Spring Boot + Vue 的科普知识共创与创意传播平台的设计与实现</p>
+      <p>本科毕业设计 · 基于 Spring Boot + Vue 的{{ siteStore.name }}的设计与实现</p>
     </footer>
 
     <!-- 移动端抽屉菜单：把桌面端的全部入口按分组列出来 -->
     <el-drawer
       v-model="drawerVisible"
       direction="rtl"
-      size="78%"
+      size="min(78%, 320px)"
       :with-header="false"
       class="mobile-drawer"
     >
@@ -233,6 +267,7 @@ onMounted(refreshUnread)
             :key="item.to"
             type="button"
             class="drawer__item"
+            :class="{ 'drawer__item--active': isActive(item.to) }"
             @click="go(item.to)"
           >
             {{ item.label }}
@@ -246,6 +281,7 @@ onMounted(refreshUnread)
             :key="item.to"
             type="button"
             class="drawer__item"
+            :class="{ 'drawer__item--active': isActive(item.to) }"
             @click="go(item.to)"
           >
             {{ item.label }}
@@ -259,6 +295,7 @@ onMounted(refreshUnread)
             :key="item.to"
             type="button"
             class="drawer__item"
+            :class="{ 'drawer__item--active': isActive(item.to) }"
             @click="go(item.to)"
           >
             {{ item.label }}
@@ -349,6 +386,12 @@ onMounted(refreshUnread)
   font-size: 15px;
   letter-spacing: 0.2px;
   white-space: nowrap;
+  /* 平台名称由后台维护，长度不可控：给一个上限并省略，
+     避免名称过长时把主导航挤出去 */
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brand__text small {
@@ -385,7 +428,7 @@ onMounted(refreshUnread)
   color: var(--sp-primary-dark);
 }
 
-.app-nav__item.router-link-exact-active {
+.app-nav__item--active {
   background: var(--sp-primary-soft);
   color: var(--sp-primary-dark);
   font-weight: 600;
@@ -648,6 +691,12 @@ onMounted(refreshUnread)
   color: var(--sp-primary-dark);
 }
 
+.drawer__item--active {
+  background: var(--sp-primary-soft);
+  color: var(--sp-primary-dark);
+  font-weight: 600;
+}
+
 .drawer__item--primary {
   justify-content: center;
   background: var(--sp-primary);
@@ -696,6 +745,10 @@ onMounted(refreshUnread)
    ========================================================================== */
 
 @media (max-width: 1024px) {
+  .brand__text strong {
+    max-width: 180px;
+  }
+
   .app-nav__item {
     padding: 7px 10px;
     font-size: 13px;

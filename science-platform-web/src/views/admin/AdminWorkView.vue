@@ -162,7 +162,9 @@ onMounted(fetchRows)
         </template>
       </el-table-column>
       <el-table-column prop="viewCount" label="浏览" width="80" />
-      <el-table-column prop="likeCount" label="点赞" width="80" />
+      <el-table-column label="关联文章" width="96">
+        <template #default="{ row }">{{ row.articleCount ?? 0 }} 篇</template>
+      </el-table-column>
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }">{{ row.createdAt }}</template>
       </el-table-column>

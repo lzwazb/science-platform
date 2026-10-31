@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { useUserStore } from '@/stores/user'
+import { useSiteStore } from '@/stores/site'
 
 /**
  * 路由表（开发档案第 9 章）。
@@ -238,7 +239,15 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to) => {
-  const base = '科普知识共创与创意传播平台'
+  // 基准标题跟随后台「系统设置」里的平台名称。
+  // store 尚未加载完成时退回默认名，保证标签页始终有意义。
+  let base = '科普知识共创与创意传播平台'
+  try {
+    const siteStore = useSiteStore()
+    base = siteStore.name || base
+  } catch {
+    // Pinia 尚未就绪（极早期导航）时使用默认值
+  }
   document.title = to.meta?.title ? `${to.meta.title} - ${base}` : base
 })
 
