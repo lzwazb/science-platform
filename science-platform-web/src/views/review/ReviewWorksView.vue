@@ -408,4 +408,10 @@ onMounted(fetchRows)
   justify-content: flex-end;
   gap: 10px;
 }
+
+@media (max-width: 768px) {
+  .review-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

@@ -476,4 +476,10 @@ onMounted(async () => {
 .profile-form {
   max-width: 560px;
 }
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

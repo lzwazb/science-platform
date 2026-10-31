@@ -299,4 +299,10 @@ onMounted(fetchRows)
   justify-content: center;
   margin-top: 20px;
 }
+
+@media (max-width: 768px) {
+  .notify-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

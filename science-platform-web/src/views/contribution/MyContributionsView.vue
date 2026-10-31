@@ -278,4 +278,10 @@ onMounted(fetchRows)
   border-radius: 8px;
   color: #8c6b2f !important;
 }
+
+@media (max-width: 768px) {
+  .mine-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

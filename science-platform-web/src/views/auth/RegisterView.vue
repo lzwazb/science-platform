@@ -220,4 +220,10 @@ async function handleSubmit() {
   color: var(--sp-text-faint);
   text-align: center;
 }
+
+@media (max-width: 768px) {
+  .auth-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

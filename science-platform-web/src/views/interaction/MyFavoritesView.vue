@@ -239,4 +239,10 @@ onMounted(fetchFavorites)
   justify-content: center;
   margin-top: 24px;
 }
+
+@media (max-width: 768px) {
+  .favorites-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

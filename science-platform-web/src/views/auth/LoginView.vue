@@ -209,4 +209,10 @@ async function handleSubmit() {
   border-color: var(--sp-primary);
   color: var(--sp-primary-dark);
 }
+
+@media (max-width: 768px) {
+  .auth-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>

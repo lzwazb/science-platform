@@ -165,4 +165,10 @@ onMounted(fetchTopics)
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+@media (max-width: 768px) {
+  .topic-page {
+    padding: var(--sp-gap) 16px var(--sp-gap-lg);
+  }
+}
 </style>
