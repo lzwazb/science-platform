@@ -124,8 +124,8 @@ onMounted(fetchRows)
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>分类管理</h1>
         <p>文章与作品共用一张分类表，通过类型区分。分类下仍有文章时不允许删除，建议改为停用。</p>
       </div>
@@ -202,27 +202,6 @@ onMounted(fetchRows)
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
 .admin-toolbar {
   display: flex;
   flex-wrap: wrap;

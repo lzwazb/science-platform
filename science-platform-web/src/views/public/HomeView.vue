@@ -5,6 +5,7 @@ import { getSiteInfo, getSiteStats } from '@/api/system'
 import { listArticles } from '@/api/article'
 import { listWorks } from '@/api/work'
 import { listEvents } from '@/api/event'
+import { TIME_STATUS } from '@/constants/dict'
 
 /**
  * 首页：平台身份 + 数据概览 + 知识共建流程 + 最新内容 + 模块入口。
@@ -127,12 +128,7 @@ const otherEvents = computed(() =>
   events.value.filter((event) => !event.acceptingSubmission).slice(0, 2),
 )
 
-const timeMeta = {
-  ONGOING: { text: '进行中', type: 'success' },
-  NOT_STARTED: { text: '未开始', type: 'info' },
-  ENDED: { text: '已结束', type: 'warning' },
-  UNPUBLISHED: { text: '未发布', type: 'info' },
-}
+const timeMeta = TIME_STATUS
 
 const modules = [
   { name: '科普知识库', detail: '分类、专题与关键词检索', link: '/knowledge' },
@@ -1018,3 +1014,4 @@ onMounted(() => {
   }
 }
 </style>
+

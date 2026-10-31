@@ -9,6 +9,7 @@ import { listMySubmissions } from '@/api/event'
 import { listMyFeedback } from '@/api/interaction'
 import { listMyWorks } from '@/api/work'
 import { useUserStore } from '@/stores/user'
+import { STATUS_META } from '@/constants/dict'
 
 const userStore = useUserStore()
 
@@ -63,20 +64,7 @@ const feedbacks = ref([])
 const works = ref([])
 const loaded = reactive({ contribution: false, favorite: false, submission: false, feedback: false, work: false })
 
-const statusMeta = {
-  PENDING: { text: '待审核', type: 'warning' },
-  APPROVED: { text: '已通过', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'danger' },
-  WITHDRAWN: { text: '已撤回', type: 'info' },
-  DRAFT: { text: '草稿', type: 'info' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  OFFLINE: { text: '已下架', type: 'warning' },
-  RESOLVED: { text: '已处理', type: 'success' },
-  PROCESSING: { text: '处理中', type: 'primary' },
-  SUBMITTED: { text: '待评审', type: 'info' },
-  REVIEWED: { text: '已评审', type: 'primary' },
-  SELECTED: { text: '已获奖', type: 'danger' },
-}
+const statusMeta = STATUS_META
 
 const typeLabels = {
   SUPPLEMENT: '补充',
@@ -380,9 +368,9 @@ onMounted(async () => {
 
 <style scoped>
 .profile-page {
-  max-width: 1080px;
+  max-width: var(--sp-container-narrow);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .profile-header {

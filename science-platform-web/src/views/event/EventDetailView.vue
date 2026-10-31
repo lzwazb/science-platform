@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { getEventDetail, submitWorkToEvent } from '@/api/event'
 import { listMyWorks } from '@/api/work'
 import { useUserStore } from '@/stores/user'
+import { TIME_STATUS } from '@/constants/dict'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,12 +23,7 @@ const worksLoading = ref(false)
 
 const eventId = computed(() => route.params.id)
 
-const timeMeta = {
-  ONGOING: { text: '进行中', type: 'success' },
-  NOT_STARTED: { text: '未开始', type: 'info' },
-  ENDED: { text: '已结束', type: 'warning' },
-  UNPUBLISHED: { text: '未发布', type: 'info' },
-}
+const timeMeta = TIME_STATUS
 
 const awardLabels = {
   FIRST: '一等奖',
@@ -437,3 +433,4 @@ onMounted(fetchDetail)
   }
 }
 </style>
+

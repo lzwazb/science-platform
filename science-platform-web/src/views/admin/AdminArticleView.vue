@@ -11,6 +11,7 @@ import {
   updateArticle,
 } from '@/api/article'
 import { listCategories } from '@/api/category'
+import { STATUS_META } from '@/constants/dict'
 
 const loading = ref(false)
 const rows = ref([])
@@ -31,11 +32,7 @@ const statusOptions = [
   { value: 'OFFLINE', label: '已下架' },
 ]
 
-const statusMeta = {
-  DRAFT: { text: '草稿', type: 'info' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  OFFLINE: { text: '已下架', type: 'warning' },
-}
+const statusMeta = STATUS_META
 
 // ---------------- 表单 ----------------
 
@@ -226,8 +223,8 @@ onMounted(() => {
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>文章管理</h1>
         <p>新建的文章先保存为草稿，发布后才对前台可见。删除为逻辑删除，历史数据仍保留。</p>
       </div>
@@ -343,27 +340,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
 .admin-toolbar {
   display: flex;
   flex-wrap: wrap;

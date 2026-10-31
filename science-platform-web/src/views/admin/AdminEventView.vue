@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { STATUS_META } from '@/constants/dict'
 import {
   closeEvent,
   confirmEventAwards,
@@ -16,12 +17,7 @@ import {
 const loading = ref(false)
 const rows = ref([])
 
-const statusMeta = {
-  DRAFT: { text: '草稿', type: 'info' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  CLOSED: { text: '已结束', type: 'warning' },
-  CANCELLED: { text: '已取消', type: 'info' },
-}
+const statusMeta = STATUS_META
 
 const timeMeta = {
   ONGOING: '进行中',
@@ -259,8 +255,8 @@ onMounted(fetchRows)
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>活动管理</h1>
         <p>
           活动需「发布」后才开始接受投稿。时间状态（未开始 / 进行中 / 已结束）由起止时间实时判定。
@@ -439,28 +435,6 @@ onMounted(fetchRows)
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  max-width: 720px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
 .admin-time {
   font-size: 12px;
   color: var(--sp-text-muted);

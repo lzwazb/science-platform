@@ -204,9 +204,9 @@ onMounted(fetchEvents)
 
 <style scoped>
 .review-page {
-  max-width: 1240px;
+  max-width: var(--sp-container-wide);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .review-head {

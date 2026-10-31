@@ -116,7 +116,7 @@ onMounted(fetchFavorites)
 .favorites-page {
   max-width: var(--sp-container);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .favorites-head {

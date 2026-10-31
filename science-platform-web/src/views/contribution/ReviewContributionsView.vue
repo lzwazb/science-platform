@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { STATUS_META } from '@/constants/dict'
 import {
   approveContribution,
   getReviewContribution,
@@ -25,12 +26,7 @@ const statusOptions = [
   { value: '', label: '全部' },
 ]
 
-const statusMeta = {
-  PENDING: { text: '待审核', type: 'warning' },
-  APPROVED: { text: '已通过', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'danger' },
-  WITHDRAWN: { text: '已撤回', type: 'info' },
-}
+const statusMeta = STATUS_META
 
 const typeLabels = {
   SUPPLEMENT: '补充',

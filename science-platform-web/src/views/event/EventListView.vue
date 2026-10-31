@@ -1,17 +1,13 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { listEvents } from '@/api/event'
+import { TIME_STATUS } from '@/constants/dict'
 
 const loading = ref(false)
 const loadError = ref('')
 const events = ref([])
 
-const timeMeta = {
-  ONGOING: { text: '进行中', type: 'success' },
-  NOT_STARTED: { text: '未开始', type: 'info' },
-  ENDED: { text: '已结束', type: 'warning' },
-  UNPUBLISHED: { text: '未发布', type: 'info' },
-}
+const timeMeta = TIME_STATUS
 
 async function fetchEvents() {
   loading.value = true
@@ -213,3 +209,4 @@ onMounted(fetchEvents)
   border-top: 1px dashed var(--sp-border);
 }
 </style>
+

@@ -147,8 +147,8 @@ onMounted(fetchRows)
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>用户与角色</h1>
         <p>
           仅超级管理员可访问。角色变更立即生效（每次请求都会重新读取角色），
@@ -274,28 +274,6 @@ onMounted(fetchRows)
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  max-width: 760px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
 .admin-toolbar {
   display: flex;
   flex-wrap: wrap;

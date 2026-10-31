@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { STATUS_META } from '@/constants/dict'
 import {
   approveWork,
   getReviewWork,
@@ -27,13 +28,7 @@ const statusOptions = [
   { value: '', label: '全部' },
 ]
 
-const statusMeta = {
-  DRAFT: { text: '草稿', type: 'info' },
-  PENDING: { text: '待审核', type: 'warning' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'danger' },
-  OFFLINE: { text: '已下架', type: 'info' },
-}
+const statusMeta = STATUS_META
 
 // 详情抽屉
 const drawerVisible = ref(false)
@@ -272,9 +267,9 @@ onMounted(fetchRows)
 
 <style scoped>
 .review-page {
-  max-width: 1240px;
+  max-width: var(--sp-container-wide);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .review-head {

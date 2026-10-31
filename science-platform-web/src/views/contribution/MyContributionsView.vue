@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listMyContributions, withdrawContribution } from '@/api/contribution'
+import { STATUS_META } from '@/constants/dict'
 
 const loading = ref(false)
 const rows = ref([])
@@ -21,12 +22,7 @@ const statusOptions = [
   { value: 'WITHDRAWN', label: '已撤回' },
 ]
 
-const statusMeta = {
-  PENDING: { text: '待审核', type: 'warning' },
-  APPROVED: { text: '已通过', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'danger' },
-  WITHDRAWN: { text: '已撤回', type: 'info' },
-}
+const statusMeta = STATUS_META
 
 const typeLabels = {
   SUPPLEMENT: '补充',
@@ -199,9 +195,9 @@ onMounted(fetchRows)
 
 <style scoped>
 .mine-page {
-  max-width: 1240px;
+  max-width: var(--sp-container-wide);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .mine-head {

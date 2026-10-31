@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleFeedback, listAdminFeedback } from '@/api/interaction'
+import { FEEDBACK_STATUS } from '@/constants/dict'
 
 const loading = ref(false)
 const rows = ref([])
@@ -21,12 +22,7 @@ const statusOptions = [
   { value: 'REJECTED', label: '已驳回' },
 ]
 
-const statusMeta = {
-  PENDING: { text: '待处理', type: 'warning' },
-  PROCESSING: { text: '处理中', type: 'primary' },
-  RESOLVED: { text: '已处理', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'info' },
-}
+const statusMeta = FEEDBACK_STATUS
 
 const typeLabels = {
   WRONG_CONTENT: '内容错误',
@@ -103,8 +99,8 @@ onMounted(fetchRows)
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>内容反馈</h1>
         <p>用户对文章、作品或评论提交的反馈。处理结果会记入操作日志，重要操作可追溯。</p>
       </div>
@@ -210,27 +206,6 @@ onMounted(fetchRows)
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
 .admin-toolbar {
   display: flex;
   align-items: center;

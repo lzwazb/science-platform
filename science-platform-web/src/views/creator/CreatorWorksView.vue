@@ -11,6 +11,7 @@ import {
 } from '@/api/work'
 import { listArticles } from '@/api/article'
 import { listCategories } from '@/api/category'
+import { STATUS_META } from '@/constants/dict'
 
 const loading = ref(false)
 const rows = ref([])
@@ -33,13 +34,7 @@ const statusOptions = [
   { value: 'OFFLINE', label: '已下架' },
 ]
 
-const statusMeta = {
-  DRAFT: { text: '草稿', type: 'info' },
-  PENDING: { text: '待审核', type: 'warning' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'danger' },
-  OFFLINE: { text: '已下架', type: 'info' },
-}
+const statusMeta = STATUS_META
 
 // ---------------- 编辑表单 ----------------
 
@@ -390,9 +385,9 @@ onMounted(() => {
 
 <style scoped>
 .creator-page {
-  max-width: 1240px;
+  max-width: var(--sp-container-wide);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .creator-head {

@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { STATUS_META } from '@/constants/dict'
 import {
   createAnnouncement,
   deleteAnnouncement,
@@ -85,11 +86,7 @@ const announcements = ref([])
 const announcementLoading = ref(false)
 const statusFilter = ref('')
 
-const statusMeta = {
-  DRAFT: { text: '草稿', type: 'info' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  OFFLINE: { text: '已下架', type: 'warning' },
-}
+const statusMeta = STATUS_META
 
 const dialogVisible = ref(false)
 const dialogMode = ref('create')
@@ -230,8 +227,8 @@ onMounted(() => {
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>系统设置</h1>
         <p>
           仅超级管理员可访问。平台名称、简介与横幅会即时反映到首页；
@@ -376,28 +373,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  max-width: 720px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
 .settings-card {
   max-width: 640px;
   padding: 22px 24px 6px;

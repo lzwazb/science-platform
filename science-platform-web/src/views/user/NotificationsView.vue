@@ -164,9 +164,9 @@ onMounted(fetchRows)
 
 <style scoped>
 .notify-page {
-  max-width: 900px;
+  max-width: var(--sp-container-reading);
   margin: 0 auto;
-  padding: 28px 24px 52px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .notify-head {

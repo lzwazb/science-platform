@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAdminWork, listAdminWorks, offlineWork } from '@/api/adminWork'
+import { STATUS_META } from '@/constants/dict'
 
 const router = useRouter()
 
@@ -17,13 +18,7 @@ const filters = reactive({
   keyword: '',
 })
 
-const statusMeta = {
-  DRAFT: { text: '草稿', type: 'info' },
-  PENDING: { text: '待审核', type: 'warning' },
-  PUBLISHED: { text: '已发布', type: 'success' },
-  REJECTED: { text: '已驳回', type: 'danger' },
-  OFFLINE: { text: '已下架', type: 'info' },
-}
+const statusMeta = STATUS_META
 
 const statusOptions = [
   { value: '', label: '全部状态' },
@@ -128,8 +123,8 @@ onMounted(fetchRows)
 
 <template>
   <div class="admin-page">
-    <header class="admin-page__head">
-      <div>
+    <header class="sp-page-head">
+      <div class="sp-page-head__text">
         <h1>作品管理</h1>
         <p>
           跨状态查看全部作品，可查看详情与下架违规内容。审核（待审核 → 通过 / 驳回）在
@@ -281,29 +276,7 @@ onMounted(fetchRows)
 </template>
 
 <style scoped>
-.admin-page__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.admin-page__head h1 {
-  margin: 0 0 6px;
-  font-size: 20px;
-  color: var(--sp-text-strong);
-}
-
-.admin-page__head p {
-  margin: 0;
-  max-width: 780px;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-}
-
-.admin-page__head a {
+.sp-page-head a {
   color: var(--sp-primary-dark);
 }
 
