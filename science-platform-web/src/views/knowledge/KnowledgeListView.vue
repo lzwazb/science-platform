@@ -235,9 +235,9 @@ onMounted(() => {
 
 <style scoped>
 .kb-page {
-  max-width: 1180px;
+  max-width: var(--sp-container);
   margin: 0 auto;
-  padding: 28px 24px 56px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .kb-hero {
@@ -310,8 +310,21 @@ onMounted(() => {
 
 .kb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  /* 桌面三列 / 中屏两列 / 手机一列（文档 4.3 节） */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-gap);
+}
+
+@media (max-width: 1024px) {
+  .kb-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .kb-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .kb-card {
@@ -332,6 +345,7 @@ onMounted(() => {
 }
 
 .kb-card__cover {
+  position: relative;
   aspect-ratio: 16 / 9;
   background: var(--sp-primary-soft);
   overflow: hidden;
@@ -410,6 +424,6 @@ onMounted(() => {
 .kb-pagination {
   display: flex;
   justify-content: center;
-  margin-top: 28px;
+  margin-top: var(--sp-gap-lg);
 }
 </style>

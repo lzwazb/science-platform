@@ -235,6 +235,100 @@ h4 {
   margin-top: var(--sp-gap-lg);
 }
 
+/* 卡片网格：桌面三列 / 中屏两列 / 手机一列
+   --------------------------------------------------------------------------
+   不用 auto-fill + minmax 的原因是它在宽屏下会排出四列，
+   而内容卡片在三列时阅读节奏最好（文档 4.3 节要求）。
+   用显式断点，行为可预期。 */
+.sp-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-gap);
+}
+
+@media (max-width: 1024px) {
+  .sp-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .sp-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 卡片封面：全站统一 16:9，避免不同类型卡片高度参差 */
+.sp-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--sp-primary-soft);
+}
+
+.sp-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 封面缺图时的统一占位 */
+.sp-cover__fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--sp-primary-dark);
+}
+
+/* 卡片内的信息区 */
+.sp-card__body {
+  padding: 14px 16px 16px;
+}
+
+/* 卡片标题：统一两行截断 */
+.sp-card__title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--sp-text-strong);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 卡片摘要：统一两行截断 */
+.sp-card__desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--sp-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 卡片底部元信息：固定在底部，保证不同高度的卡片对齐 */
+.sp-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--sp-border);
+  font-size: 11px;
+  color: var(--sp-text-faint);
+}
+
+.sp-card__meta-spacer {
+  margin-left: auto;
+}
+
 /* 全站统一的交互过渡 */
 .sp-interactive {
   transition:

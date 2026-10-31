@@ -180,58 +180,7 @@ onMounted(() => {
       </aside>
     </section>
 
-    <!-- 二、系统公告 -->
-    <section v-if="site.announcements?.length" class="announcements">
-      <div class="announcements__head">
-        <span class="announcements__icon">公告</span>
-        <span class="announcements__hint">共 {{ site.announcements.length }} 条，点击展开全文</span>
-      </div>
-      <ul class="announcements__list">
-        <li
-          v-for="item in site.announcements"
-          :key="item.id"
-          class="announcement"
-          :class="{ 'announcement--open': expandedAnnouncement === item.id }"
-          @click="toggleAnnouncement(item.id)"
-        >
-          <div class="announcement__head">
-            <strong>{{ item.title }}</strong>
-            <span class="announcement__time">{{ formatDate(item.publishedAt) }}</span>
-          </div>
-          <p v-if="expandedAnnouncement === item.id" class="announcement__content">
-            {{ item.content }}
-          </p>
-        </li>
-      </ul>
-    </section>
-
-    <!-- 三、知识共建流程：本项目的核心特色 -->
-    <section class="workflow">
-      <div class="section-head">
-        <h2>知识怎么被「共建」</h2>
-        <p>
-          这里不只是读文章。读者提交的每一条建议都会经过人工审核，
-          被采纳的内容进入正式正文，旧版本完整留存——所以「这处改动是谁提的、什么时候改的」始终可查。
-        </p>
-      </div>
-
-      <ol class="workflow__steps">
-        <li v-for="item in workflow" :key="item.step" class="workflow-step">
-          <span class="workflow-step__no">{{ item.step }}</span>
-          <h3>{{ item.title }}</h3>
-          <p>{{ item.detail }}</p>
-        </li>
-      </ol>
-
-      <p class="workflow__note">
-        已采纳读者建议 <strong>{{ stats?.adoptedContributionCount ?? '—' }}</strong> 条
-        <template v-if="stats?.adoptedContributionCount">
-          ，每一条都能在对应文章的「版本历史」里追溯到来源建议编号。
-        </template>
-      </p>
-    </section>
-
-    <!-- 四、最新文章 -->
+    <!-- 二、最新科普文章 -->
     <section class="section">
       <div class="section-head section-head--row">
         <div>
@@ -274,7 +223,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- 五、最新作品 -->
+    <!-- 三、最新创意作品 -->
     <section class="section">
       <div class="section-head section-head--row">
         <div>
@@ -313,7 +262,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- 六、主题活动 -->
+    <!-- 四、主题活动 -->
     <section v-if="ongoingEvents.length || otherEvents.length" class="section">
       <div class="section-head section-head--row">
         <div>
@@ -350,6 +299,60 @@ onMounted(() => {
       </div>
     </section>
 
+    <!-- 五、知识共建流程：本项目的核心特色 -->
+    <section class="workflow">
+      <div class="section-head">
+        <h2>知识怎么被「共建」</h2>
+        <p>
+          这里不只是读文章。读者提交的每一条建议都会经过人工审核，
+          被采纳的内容进入正式正文，旧版本完整留存——所以「这处改动是谁提的、什么时候改的」始终可查。
+        </p>
+      </div>
+
+      <ol class="workflow__steps">
+        <li v-for="item in workflow" :key="item.step" class="workflow-step">
+          <span class="workflow-step__no">{{ item.step }}</span>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.detail }}</p>
+        </li>
+      </ol>
+
+      <p class="workflow__note">
+        已采纳读者建议 <strong>{{ stats?.adoptedContributionCount ?? '—' }}</strong> 条
+        <template v-if="stats?.adoptedContributionCount">
+          ，每一条都能在对应文章的「版本历史」里追溯到来源建议编号。
+        </template>
+      </p>
+    </section>
+
+
+    <!-- 六、系统公告 -->
+    <section v-if="site.announcements?.length" class="announcements">
+      <div class="announcements__head">
+        <span class="announcements__icon">公告</span>
+        <span class="announcements__hint">共 {{ site.announcements.length }} 条，点击展开全文</span>
+      </div>
+      <ul class="announcements__list">
+        <li
+          v-for="item in site.announcements"
+          :key="item.id"
+          class="announcement"
+          :class="{ 'announcement--open': expandedAnnouncement === item.id }"
+          @click="toggleAnnouncement(item.id)"
+        >
+          <div class="announcement__head">
+            <strong>{{ item.title }}</strong>
+            <span class="announcement__time">{{ formatDate(item.publishedAt) }}</span>
+          </div>
+          <p v-if="expandedAnnouncement === item.id" class="announcement__content">
+            {{ item.content }}
+          </p>
+        </li>
+      </ul>
+    </section>
+
+
+
     <!-- 七、模块入口 -->
     <section class="modules">
       <div class="modules__grid">
@@ -383,7 +386,7 @@ onMounted(() => {
 
 <style scoped>
 .home {
-  max-width: 1180px;
+  max-width: var(--sp-container);
   margin: 0 auto;
   padding: 28px 24px 40px;
 }

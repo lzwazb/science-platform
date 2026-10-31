@@ -59,9 +59,9 @@ onMounted(fetchTopics)
 
 <style scoped>
 .topic-page {
-  max-width: 1180px;
+  max-width: var(--sp-container);
   margin: 0 auto;
-  padding: 28px 24px 56px;
+  padding: var(--sp-gap-lg) 20px var(--sp-gap-xl);
 }
 
 .topic-hero {

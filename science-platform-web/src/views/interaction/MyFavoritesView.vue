@@ -114,7 +114,7 @@ onMounted(fetchFavorites)
 
 <style scoped>
 .favorites-page {
-  max-width: 1180px;
+  max-width: var(--sp-container);
   margin: 0 auto;
   padding: 28px 24px 52px;
 }
