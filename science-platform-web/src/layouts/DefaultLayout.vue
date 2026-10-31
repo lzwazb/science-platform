@@ -214,7 +214,9 @@ onMounted(refreshUnread)
     >
       <div class="drawer">
         <div class="drawer__head">
-          <span class="brand__mark brand__mark--sm">科</span>
+          <el-avatar :size="30" :src="userStore.profile?.avatar || undefined">
+            {{ userStore.profile?.nickname?.charAt(0) || '?' }}
+          </el-avatar>
           <div class="drawer__user">
             <strong>{{ userStore.profile?.nickname || '未登录' }}</strong>
             <small>{{ primaryRoleLabel }}</small>
@@ -335,12 +337,6 @@ onMounted(refreshUnread)
   display: grid;
   place-items: center;
   flex-shrink: 0;
-}
-
-.brand__mark--sm {
-  width: 30px;
-  height: 30px;
-  font-size: 14px;
 }
 
 .brand__text {
@@ -566,6 +562,9 @@ onMounted(refreshUnread)
   flex-direction: column;
   height: 100%;
   gap: 4px;
+  /* 菜单项多于一屏时可滚动，避免「退出登录」被挤出可视区 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .drawer__head {
@@ -575,6 +574,11 @@ onMounted(refreshUnread)
   padding-bottom: 14px;
   margin-bottom: 6px;
   border-bottom: 1px solid var(--sp-border);
+  /* 菜单滚动时头部（含关闭按钮）保持可见，否则滚到底部就找不到关闭入口 */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--sp-surface);
 }
 
 .drawer__user {

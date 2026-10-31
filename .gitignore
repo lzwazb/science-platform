@@ -44,3 +44,7 @@ doc.docx
 doc.txt
 .tmp-tools/
 *.tmp
+
+# 浏览器自动化测试产物
+.playwright-mcp/
+ui-*.png

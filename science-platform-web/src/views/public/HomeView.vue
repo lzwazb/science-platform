@@ -978,19 +978,27 @@ onMounted(() => {
     padding: 28px 24px;
   }
 
+  /* 窄屏改用三列网格：五个数字排成 3 + 2 两行。
+     原来用 flex-wrap，在 375px 下会排成 4 + 1，最后一项孤零零挂在第二行。 */
   .hero__stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 18px;
-    padding: 16px 0 0;
+    gap: 14px 10px;
+    padding: 18px 0 0;
     border-left: none;
     border-top: 1px solid var(--sp-border);
   }
 
   .stat {
     flex-direction: column;
-    gap: 4px;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 0;
+  }
+
+  .stat__value {
+    font-size: 22px;
   }
 
   .section-head--row {
