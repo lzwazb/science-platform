@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listArticles } from '@/api/article'
 import { listCategories } from '@/api/category'
+import { themeOf } from '@/constants/dict'
 
 const route = useRoute()
 const router = useRouter()
@@ -199,6 +200,7 @@ onMounted(() => {
           :key="article.id"
           :to="`/knowledge/${article.id}`"
           class="kb-card"
+          :style="{ '--cat': themeOf(article.categoryName).color }"
         >
           <div class="kb-card__cover">
             <img v-if="coverOf(article)" :src="coverOf(article)" :alt="article.title" loading="lazy" />
@@ -206,7 +208,7 @@ onMounted(() => {
           </div>
           <div class="kb-card__body">
             <div class="kb-card__meta">
-              <el-tag size="small" effect="plain" type="primary">{{ article.categoryName || '未分类' }}</el-tag>
+              <span class="kb-card__cat">{{ article.categoryName || '未分类' }}</span>
               <span class="kb-card__date">{{ (article.publishedAt || '').slice(0, 10) }}</span>
             </div>
             <h3 class="kb-card__title">{{ article.title }}</h3>
@@ -241,17 +243,20 @@ onMounted(() => {
 }
 
 .kb-hero {
-  padding: 30px 32px;
-  border-radius: 16px;
+  /* 原来 30/32 的内边距 + 26px 标题占了近 180px，而这里只有标题、说明和一个搜索框。
+     压到 22/26、标题 21px 之后约 120px，把高度让给下面的内容网格。 */
+  padding: 22px 26px;
+  border-radius: 14px;
   border: 1px solid var(--sp-border);
   background:
-    radial-gradient(circle at 84% 20%, var(--sp-primary-a16), transparent 46%),
-    linear-gradient(135deg, #f4f9ff 0%, #ffffff 64%);
+    radial-gradient(circle at 88% 12%, var(--sp-primary-a12), transparent 42%),
+    linear-gradient(135deg, #f5f9ff 0%, #ffffff 70%);
 }
 
 .kb-hero h1 {
-  margin: 0 0 8px;
-  font-size: 26px;
+  margin: 0 0 6px;
+  font-size: 21px;
+  letter-spacing: -0.3px;
   color: var(--sp-text-strong);
 }
 
@@ -310,38 +315,53 @@ onMounted(() => {
 
 .kb-grid {
   display: grid;
-  /* 桌面三列 / 中屏两列 / 手机一列（文档 4.3 节） */
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-gap);
+  /* 四列：1440 下每张卡约 285px，一屏能看到 8 张卡的完整信息。
+     三列在 1440 下每张 400px，封面对 16:9 来说太大、信息密度偏低。 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1280px) {
+  .kb-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
   .kb-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 560px) {
   .kb-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
+/* --------------------------------------------------------------------------
+   文章卡片
+   每张卡片带一个 --cat 变量（学科主题色），卡片本身不设边框，
+   靠封面和留白建立层级；hover 时封面上浮一层同色柔光。
+   -------------------------------------------------------------------------- */
+
 .kb-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--sp-border);
   border-radius: 14px;
   background: #fff;
   text-decoration: none;
   overflow: hidden;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  box-shadow: 0 1px 2px rgba(24, 44, 68, 0.05);
+  /* 纯阴影在浅色底上会显得悬浮，补一条几乎看不见的边框把卡片压住 */
+  border: 1px solid rgba(24, 44, 68, 0.06);
+  transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
 }
 
 .kb-card:hover {
-  border-color: var(--sp-primary-a50);
-  box-shadow: 0 10px 24px var(--sp-primary-a12);
-  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -8px rgba(24, 44, 68, 0.18);
+  border-color: rgba(24, 44, 68, 0.10);
+  transform: translateY(-3px);
 }
 
 .kb-card__cover {
@@ -356,6 +376,27 @@ onMounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.kb-card:hover .kb-card__cover img {
+  transform: scale(1.045);
+}
+
+/* 学科色极淡叠色：让同类文章的封面成组，同时不抢照片本身 */
+.kb-card__cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--cat, var(--sp-primary));
+  opacity: 0;
+  mix-blend-mode: soft-light;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+
+.kb-card:hover .kb-card__cover::after {
+  opacity: 0.35;
 }
 
 .kb-card__cover-fallback {
@@ -365,14 +406,14 @@ onMounted(() => {
   place-items: center;
   font-size: 32px;
   font-weight: 700;
-  color: var(--sp-primary-dark);
+  color: var(--cat, var(--sp-primary-dark));
 }
 
 .kb-card__body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px 16px;
+  gap: 7px;
+  padding: 13px 15px 14px;
   flex: 1;
 }
 
@@ -383,26 +424,56 @@ onMounted(() => {
   gap: 8px;
 }
 
+/* 分类不再是统一蓝色的 tag，而是学科自己的颜色 + 一条竖线，更轻也更可辨 */
+.kb-card__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--cat, var(--sp-primary-dark));
+}
+
+.kb-card__cat::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--cat, var(--sp-primary));
+}
+
 .kb-card__date {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--sp-text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .kb-card__title {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.55;
+  letter-spacing: -0.1px;
   color: var(--sp-text-strong);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  transition: color 0.18s ease;
+  /* 两行截断时让两行长度接近，避免出现「第一行塞满、第二行只剩一个字」
+     的孤字（如「…长期记 / 忆」）。不支持的浏览器会忽略这行，退回普通换行。 */
+  text-wrap: balance;
+}
+
+.kb-card:hover .kb-card__title {
+  color: var(--cat, var(--sp-primary-dark));
 }
 
 .kb-card__summary {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 12.5px;
+  line-height: 1.65;
   color: var(--sp-text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -415,10 +486,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--sp-text-faint);
-  padding-top: 8px;
-  border-top: 1px dashed var(--sp-border);
+  padding-top: 9px;
+  border-top: 1px solid var(--sp-border);
 }
 
 .kb-pagination {

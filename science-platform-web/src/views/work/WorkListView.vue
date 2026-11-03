@@ -276,17 +276,23 @@ onMounted(() => {
 .works-grid {
   display: grid;
   /* 桌面三列 / 中屏两列 / 手机一列 */
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-gap);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1280px) {
+  .work-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
   .work-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 560px) {
   .work-grid {
     grid-template-columns: minmax(0, 1fr);
   }

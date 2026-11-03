@@ -120,7 +120,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 理解银河系的关键不是记住某个数字，而是理解测量方法的边界：越远、越被遮挡、越暗的部分，误差越大。
 
 参考来源：NASA Science 官网银河系科普页面（https://science.nasa.gov/）；事件视界望远镜合作组织官方公告（https://eventhorizontelescope.org/）。',
- '/images/articles/milky-way.svg', 1, 2, 'PUBLISHED', '2026-02-15 10:00:00', 1520, 1, '2026-02-10 09:00:00', '2026-02-15 10:00:00', 0),
+ '/images/articles/article-01-galaxy-ngc3147.jpg', 1, 2, 'PUBLISHED', '2026-02-15 10:00:00', 1520, 1, '2026-02-10 09:00:00', '2026-02-15 10:00:00', 0),
 
 (2, '太阳系是怎么形成的？从一团星云说起',
  '约四十六亿年前，一团分子云在自身引力下坍缩，中心形成太阳，外围的尘埃与气体通过碰撞吸积长成行星。',
@@ -133,7 +133,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 盘中的剩余气体随后被太阳风和辐射压清扫出去，太阳系进入相对稳定的阶段。月球一般认为形成于一次大碰撞，但具体细节仍有争论。
 
 参考来源：NASA Science 太阳系专题（https://science.nasa.gov/solar-system/）。',
- '/images/articles/solar-system.svg', 1, 2, 'PUBLISHED', '2026-02-20 14:00:00', 1180, 1, '2026-02-16 09:00:00', '2026-02-20 14:00:00', 0),
+ '/images/articles/article-02-galaxy-m83.jpg', 1, 2, 'PUBLISHED', '2026-02-20 14:00:00', 1180, 1, '2026-02-16 09:00:00', '2026-02-20 14:00:00', 0),
 
 (3, 'DNA 双螺旋：生命如何储存信息',
  'DNA 由两条互补的核苷酸链盘绕成双螺旋，碱基 A 与 T、G 与 C 配对，通过半保留复制把信息传给下一代。',
@@ -148,7 +148,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 人类基因组约含三十亿个碱基对，但编码蛋白质的序列只占很小一部分，其余包括调控序列、重复序列等。所谓“基因决定性状”并不准确：性状通常是基因与环境共同作用的结果。
 
 参考来源：美国国家生物技术信息中心 NCBI Bookshelf 公开教材（https://www.ncbi.nlm.nih.gov/books/）；《Molecular Biology of the Cell》相关内容。',
- '/images/articles/dna.svg', 2, 2, 'PUBLISHED', '2026-03-05 11:00:00', 2060, 2, '2026-02-28 10:00:00', '2026-06-18 16:20:00', 0),
+ '/images/articles/article-03-chromosome.jpg', 2, 2, 'PUBLISHED', '2026-03-05 11:00:00', 2060, 2, '2026-02-28 10:00:00', '2026-06-18 16:20:00', 0),
 
 (4, '光合作用分两步：光反应与卡尔文循环',
  '光合作用在叶绿体中进行，光反应把光能转成 ATP 和 NADPH 并释放氧气，暗反应在基质中固定二氧化碳合成糖。',
@@ -163,7 +163,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 需要说明的是，光合作用效率并非固定值，受光照强度、温度、二氧化碳浓度和水分的共同限制。这也是农业生产中“合理密植”“遮阴降温”背后的道理。
 
 参考来源：美国能源部植物研究相关公开资料；《Plant Physiology》教材关于光反应与卡尔文循环的章节。',
- '/images/articles/photosynthesis.svg', 2, 2, 'PUBLISHED', '2026-03-12 09:30:00', 940, 1, '2026-03-08 09:00:00', '2026-03-12 09:30:00', 0),
+ '/images/articles/article-04-leaf-cells.jpg', 2, 2, 'PUBLISHED', '2026-03-12 09:30:00', 940, 1, '2026-03-08 09:00:00', '2026-03-12 09:30:00', 0),
 
 (5, 'HTTPS 到底加密了什么？一次握手的四步',
  'HTTPS 在 HTTP 之下加了 TLS，用证书验证服务器身份，用非对称算法协商会话密钥，再用对称算法加密传输内容。',
@@ -180,7 +180,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 默认端口是 443。部署证书有成本，但免费证书（如 Let''s Encrypt）已经把门槛降到很低，目前主流实践是全站 HTTPS。
 
 参考来源：Mozilla Privacy Not Included 与 MDN Web 文档 TLS 章节（https://developer.mozilla.org/）；IETF RFC 8446（TLS 1.3）。',
- '/images/articles/https.svg', 3, 2, 'PUBLISHED', '2026-04-08 15:00:00', 1730, 1, '2026-04-02 10:00:00', '2026-04-08 15:00:00', 0),
+ '/images/articles/article-05-wafer.jpg', 3, 2, 'PUBLISHED', '2026-04-08 15:00:00', 1730, 1, '2026-04-02 10:00:00', '2026-04-08 15:00:00', 0),
 
 (6, '蛋白质结构预测：从序列到三维形状',
  '蛋白质功能由三维结构决定，而结构由氨基酸序列决定。深度学习模型让序列到结构的预测精度大幅提升。',
@@ -195,7 +195,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 仍有限制：多蛋白复合物、动态构象、无序区域、与配体结合后的构象变化，都还在研究中。结构预测不是结构的终点，而是实验的新起点。
 
 参考来源：蛋白质数据库 PDB（https://www.rcsb.org/）；CASP 官方评估结果（https://predictioncenter.org/）；诺贝尔奖官网 2024 年化学奖公告（https://www.nobelprize.org/）。',
- '/images/articles/protein.svg', 3, 2, 'PUBLISHED', '2026-05-06 10:00:00', 1280, 1, '2026-04-28 09:00:00', '2026-05-06 10:00:00', 0),
+ '/images/articles/article-06-protein-crystal.jpg', 3, 2, 'PUBLISHED', '2026-05-06 10:00:00', 1280, 1, '2026-04-28 09:00:00', '2026-05-06 10:00:00', 0),
 
 (7, '碳循环与碳中和：地球的收支账',
  '碳在大气、海洋、陆地生态系统之间循环。工业化以来化石燃料燃烧使大气二氧化碳浓度显著上升，碳中和要求排放与吸收相抵。',
@@ -212,7 +212,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 还有一个常被混淆的概念：碳中和针对二氧化碳，碳达峰指排放量由增转降的拐点，两者不是同一件事，时间安排也不同。
 
 参考来源：世界气象组织 WMO 温室气体公报（https://wmo.int/）；政府间气候变化专门委员会 IPCC 第六次评估报告（https://www.ipcc.ch/）。',
- '/images/articles/carbon-cycle.svg', 5, 2, 'PUBLISHED', '2026-07-10 14:00:00', 1610, 1, '2026-07-02 10:00:00', '2026-07-10 14:00:00', 0),
+ '/images/articles/article-07-earth.jpg', 5, 2, 'PUBLISHED', '2026-07-10 14:00:00', 1610, 1, '2026-07-02 10:00:00', '2026-07-10 14:00:00', 0),
 
 (8, '疫苗为什么有效：一次预演换来长期记忆',
  '疫苗通过引入安全的抗原，让免疫系统提前建立记忆 B 细胞和记忆 T 细胞，等真实病原体入侵时能快速响应。',
@@ -227,7 +227,7 @@ INSERT INTO `science_article` (`id`, `title`, `summary`, `content`, `cover_url`,
 几点需要说明。第一，疫苗不能保证百分之百不感染，但显著降低重症和死亡风险。第二，群体免疫需要足够比例的人群获得免疫，具体阈值取决于病原体传播力。第三，接种后常见的发热、酸痛是免疫应答在工作，多数情况下属于预期反应。
 
 参考来源：世界卫生组织 WHO 疫苗与免疫专题（https://www.who.int/health-topics/vaccines-and-immunization）；中国疾病预防控制中心科普资料（https://www.chinacdc.cn/）。',
- '/images/articles/vaccine.svg', 6, 2, 'PUBLISHED', '2026-09-20 09:00:00', 720, 1, '2026-09-12 10:00:00', '2026-09-20 09:00:00', 0);
+ '/images/articles/article-08-virus.jpg', 6, 2, 'PUBLISHED', '2026-09-20 09:00:00', 720, 1, '2026-09-12 10:00:00', '2026-09-20 09:00:00', 0);
 
 INSERT INTO `topic_article` (`id`, `topic_id`, `article_id`, `sort_order`, `created_at`) VALUES
 (1, 1, 1, 1, '2026-02-15 10:05:00'),

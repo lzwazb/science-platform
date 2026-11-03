@@ -7,6 +7,7 @@ import { listArticleVersions, submitContribution } from '@/api/contribution'
 import { useUserStore } from '@/stores/user'
 import InteractionBar from '@/components/InteractionBar.vue'
 import CommentSection from '@/components/CommentSection.vue'
+import { themeOf } from '@/constants/dict'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,7 +129,11 @@ onMounted(fetchDetail)
 </script>
 
 <template>
-  <div class="article-page" v-loading="loading">
+  <div
+    class="article-page"
+    v-loading="loading"
+    :style="{ '--cat': themeOf(article?.categoryName).color }"
+  >
     <el-breadcrumb separator="/" class="article-breadcrumb">
       <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
       <el-breadcrumb-item :to="{ path: '/knowledge' }">知识库</el-breadcrumb-item>
@@ -150,9 +155,7 @@ onMounted(fetchDetail)
       <article class="article-shell">
         <header class="article-head">
           <div class="article-head__meta">
-            <el-tag size="small" effect="plain" type="primary">
-              {{ article.categoryName || '未分类' }}
-            </el-tag>
+            <span class="article-head__cat">{{ article.categoryName || '未分类' }}</span>
             <span>第 {{ article.versionNo }} 版</span>
             <span>{{ (article.publishedAt || '').slice(0, 10) }}</span>
             <span>阅读 {{ article.viewCount }}</span>
@@ -342,6 +345,40 @@ onMounted(fetchDetail)
   max-width: var(--sp-container-reading);
   margin: 0 auto;
   padding: 24px 24px 56px;
+  /* 学科主题色，由模板上的 :style 注入，用于顶部指示线与分类文字 */
+  --cat: var(--sp-primary);
+}
+
+/* 详情卡片顶部的一条学科色指示线：进门就知道这是哪一类内容 */
+.article-head__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--cat, var(--sp-primary-dark));
+}
+
+.article-head__cat::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--cat, var(--sp-primary));
+}
+
+.article-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.article-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cat), transparent 72%);
 }
 
 .article-breadcrumb {

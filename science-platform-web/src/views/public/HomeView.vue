@@ -6,7 +6,7 @@ import { useSiteStore } from '@/stores/site'
 import { listArticles } from '@/api/article'
 import { listWorks } from '@/api/work'
 import { listEvents } from '@/api/event'
-import { TIME_STATUS } from '@/constants/dict'
+import { TIME_STATUS, themeOf } from '@/constants/dict'
 
 /**
  * 首页：平台身份 + 数据概览 + 知识共建流程 + 最新内容 + 模块入口。
@@ -183,6 +183,7 @@ onMounted(() => {
           :key="article.id"
           :to="`/knowledge/${article.id}`"
           class="article-card"
+          :style="{ '--cat': themeOf(article.categoryName).color }"
         >
           <div class="article-card__cover">
             <img v-if="article.coverUrl" :src="article.coverUrl" :alt="article.title" loading="lazy" />
@@ -722,10 +723,22 @@ onMounted(() => {
 }
 
 .article-card__category {
-  padding: 1px 8px;
-  border-radius: 4px;
-  background: var(--sp-primary-soft);
-  color: var(--sp-primary-dark);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--cat, var(--sp-primary-dark));
+}
+
+/* 学科色竖线，与知识库列表页同一套做法 */
+.article-card__category::before {
+  content: '';
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--cat, var(--sp-primary));
 }
 
 .article-card__body h3 {

@@ -113,3 +113,37 @@ export const TARGET_TYPE_LABELS = {
 export function statusOf(status, dict = STATUS_META) {
   return dict[status] || { text: status || '—', type: 'info' }
 }
+
+/**
+ * 学科主题色
+ * --------------------------------------------------------------------------
+ * 全站只有一种品牌蓝时，天文、生物、医学、物理的内容看起来一模一样，
+ * 用户扫不出差别。给每个学科一个色相，用在：
+ *   - 列表卡片的分类标签
+ *   - 封面上的一层极淡叠色（让同类内容的卡片成组）
+ *   - 详情页的分类指示线
+ *
+ * 色相取自各学科最常见的视觉联想，饱和度统一压到中等，
+ * 保证六色并排时不打架、也能和品牌蓝共处。
+ */
+export const CATEGORY_THEME = {
+  天文学: { key: 'astronomy', color: '#5b6ee1', soft: 'rgba(91,110,225,0.10)' },
+  生命科学: { key: 'life', color: '#15a081', soft: 'rgba(21,160,129,0.10)' },
+  健康医学: { key: 'medical', color: '#e0645c', soft: 'rgba(224,100,92,0.10)' },
+  地球与环境: { key: 'earth', color: '#3f9e5a', soft: 'rgba(63,158,90,0.10)' },
+  信息技术: { key: 'tech', color: '#8b5cf6', soft: 'rgba(139,92,246,0.10)' },
+  物理化学: { key: 'physics', color: '#d18f28', soft: 'rgba(209,143,40,0.10)' },
+}
+
+/** 兜底：未匹配到学科时用品牌蓝 */
+const FALLBACK_THEME = { key: 'default', color: '#347fd1', soft: 'rgba(52,127,209,0.10)' }
+
+/**
+ * 按分类名取主题色。
+ * 后端只给分类名，没有稳定的 code，所以按名称匹配；
+ * 匹配不到时回落到品牌色，不会出现空白。
+ */
+export function themeOf(categoryName) {
+  if (!categoryName) return FALLBACK_THEME
+  return CATEGORY_THEME[categoryName] || FALLBACK_THEME
+}
