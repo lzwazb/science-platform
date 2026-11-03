@@ -15,14 +15,14 @@
 | 引用完整 | 强关联（谁属于谁）用外键约束；多态关联（评论/点赞/收藏指向文章或作品）不加外键，由 Service 校验 |
 | 幂等约束 | 点赞、收藏、投稿、评审、专题文章、作品文章关系均设唯一索引，从数据库层杜绝重复数据 |
 
-## 2. 表分组（共 22 张）
+## 2. 表分组（共 21 张）
 
 | 分组 | 表 | 说明 |
 | --- | --- | --- |
 | 账号与权限（3） | `sys_user`、`sys_role`、`sys_user_role` | 用户、角色字典、多对多授权 |
 | 知识库（4） | `science_category`、`science_topic`、`science_article`、`topic_article` | 分类、专题、正式文章、专题与文章关联 |
 | 可追溯（2） | `article_version`、`knowledge_contribution` | 历史版本快照、知识补充/纠错建议 |
-| 创意作品（2） | `creator_work`、`work_article_relation` | 作品本体、作品与文章关联 |
+| 创意作品（1） | `creator_work` | 作品本体，含形态分类与所属学科 |
 | 社区互动（4） | `interaction_comment`、`interaction_like`、`interaction_favorite`、`content_feedback` | 评论、点赞、收藏、内容反馈 |
 | 主题活动（3） | `creative_event`、`event_submission`、`event_review` | 活动、投稿、评审 |
 | 消息与日志（2） | `sys_notification`、`sys_operation_log` | 站内通知、重要操作日志 |
@@ -51,8 +51,6 @@ erDiagram
 
     sys_user ||--o{ creator_work : "创作"
     science_category ||--o{ creator_work : "归类"
-    creator_work ||--o{ work_article_relation : "关联"
-    science_article ||--o{ work_article_relation : "被引用"
 
     sys_user ||--o{ interaction_comment : "发表"
     sys_user ||--o{ interaction_like : "点赞"
@@ -77,7 +75,7 @@ erDiagram
 
 1. **用户与角色是多对多**。一个用户可以同时是创作者和普通用户；管理员与超级管理员的账号由初始化脚本创建，不开放自助注册。角色判断在后端完成，前端菜单只是体验层。
 2. **一篇文章可以属于多个专题**，一个专题包含多篇文章，因此需要 `topic_article` 关联表，并保留 `sort_order` 控制专题内的阅读顺序。
-3. **一件作品可以关联多篇科普文章**，一篇文章也可以被多件作品引用，通过 `work_article_relation` 表达。这是「知识文章与创意作品存在明确关联」这一项目特色的数据基础。
+3. **作品通过「所属学科」与文章建立关联**：`creator_work.knowledge_category_id` 指向知识库分类（可为空），文章与作品按同一学科归组，取代了原来逐篇挂接的做法。`creator_work.category_id` 另有分工，描述作品形态（图文 / 海报 / 漫画 / 短视频）。
 4. **知识贡献与文章版本是两条独立的链**：贡献记录的是「读者提交了什么、谁审核、结论如何」；版本记录的是「文章曾经是什么样」。两者通过 `article_version.source_contribution_id` 连起来，实现从历史版本反查是哪条贡献导致的修改。
 5. **活动评审记录关联投稿而不是直接关联作品**。因为同一件作品可以在不同活动中被评审，评审分属于具体的投稿记录。
 6. **通知通过 `related_type + related_id` 指向业务对象**，便于前端从消息跳回文章、作品或活动。
@@ -112,7 +110,7 @@ erDiagram
 
 | 项目 | 数量 |
 | --- | --- |
-| 表 | 22 |
+| 表 | 21 |
 | 外键约束 | 31 |
 | 索引（含主键与唯一索引） | 79 |
 

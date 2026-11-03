@@ -11,9 +11,7 @@ import com.science.platform.modules.knowledge.mapper.ScienceCategoryMapper;
 import com.science.platform.modules.user.entity.SysUser;
 import com.science.platform.modules.user.mapper.SysUserMapper;
 import com.science.platform.modules.work.entity.CreatorWork;
-import com.science.platform.modules.work.entity.WorkArticleRelation;
 import com.science.platform.modules.work.mapper.CreatorWorkMapper;
-import com.science.platform.modules.work.mapper.WorkArticleRelationMapper;
 import com.science.platform.modules.work.vo.ArticleBriefVO;
 import com.science.platform.modules.work.vo.WorkBriefVO;
 import com.science.platform.modules.work.vo.WorkDetailVO;
@@ -42,18 +40,15 @@ public class WorkQueryService {
     public static final String STATUS_PENDING = "PENDING";
 
     private final CreatorWorkMapper workMapper;
-    private final WorkArticleRelationMapper relationMapper;
     private final ScienceArticleMapper articleMapper;
     private final ScienceCategoryMapper categoryMapper;
     private final SysUserMapper sysUserMapper;
 
     public WorkQueryService(CreatorWorkMapper workMapper,
-                            WorkArticleRelationMapper relationMapper,
-                            ScienceArticleMapper articleMapper,
+                                            ScienceArticleMapper articleMapper,
                             ScienceCategoryMapper categoryMapper,
                             SysUserMapper sysUserMapper) {
         this.workMapper = workMapper;
-        this.relationMapper = relationMapper;
         this.articleMapper = articleMapper;
         this.categoryMapper = categoryMapper;
         this.sysUserMapper = sysUserMapper;
@@ -159,18 +154,17 @@ public class WorkQueryService {
      * 查询某篇文章关联的、已发布的作品（用于文章详情页「相关创意作品」）。
      */
     public List<WorkBriefVO> findPublishedWorksOfArticle(Long articleId) {
-        LambdaQueryWrapper<WorkArticleRelation> relWrapper = new LambdaQueryWrapper<>();
-        relWrapper.eq(WorkArticleRelation::getArticleId, articleId);
-        List<WorkArticleRelation> relations = relationMapper.selectList(relWrapper);
-        if (relations.isEmpty()) {
+        // 作品不再直接挂文章，改为按「文章所属学科」找同分类作品
+        ScienceArticle article = articleMapper.selectById(articleId);
+        if (article == null || article.getCategoryId() == null) {
             return Collections.emptyList();
         }
-
-        List<Long> workIds = relations.stream().map(WorkArticleRelation::getWorkId).distinct().toList();
         LambdaQueryWrapper<CreatorWork> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(CreatorWork::getId, workIds)
+        wrapper.eq(CreatorWork::getKnowledgeCategoryId, article.getCategoryId())
                 .eq(CreatorWork::getStatus, STATUS_PUBLISHED)
-                .orderByDesc(CreatorWork::getId);
+                .eq(CreatorWork::getDeleted, 0)
+                .orderByDesc(CreatorWork::getId)
+                .last("LIMIT 4");
 
         List<CreatorWork> works = workMapper.selectList(wrapper);
         if (works.isEmpty()) {
@@ -248,24 +242,6 @@ public class WorkQueryService {
         Map<Long, String> categoryNames = categoryNameMapOfWorks(works);
         Map<Long, String> creatorNames = creatorNameMap(works);
 
-        // 关联文章：一次取全部作品的关联，再按作品分组
-        List<Long> workIds = works.stream().map(CreatorWork::getId).toList();
-        LambdaQueryWrapper<WorkArticleRelation> relWrapper = new LambdaQueryWrapper<>();
-        relWrapper.in(WorkArticleRelation::getWorkId, workIds);
-        List<WorkArticleRelation> relations = relationMapper.selectList(relWrapper);
-
-        Map<Long, List<Long>> articleIdsByWork = relations.stream()
-                .collect(Collectors.groupingBy(
-                        WorkArticleRelation::getWorkId,
-                        Collectors.mapping(WorkArticleRelation::getArticleId, Collectors.toList())));
-
-        Map<Long, String> articleTitles = Collections.emptyMap();
-        Set<Long> allArticleIds = relations.stream().map(WorkArticleRelation::getArticleId).collect(Collectors.toSet());
-        if (!allArticleIds.isEmpty()) {
-            articleTitles = articleMapper.selectBatchIds(allArticleIds).stream()
-                    .collect(Collectors.toMap(ScienceArticle::getId, ScienceArticle::getTitle));
-        }
-        Map<Long, String> finalArticleTitles = articleTitles;
 
         return works.stream().map(work -> {
             WorkListItemVO vo = new WorkListItemVO();
@@ -284,14 +260,8 @@ public class WorkQueryService {
             vo.setCreatedAt(work.getCreatedAt());
             vo.setUpdatedAt(work.getUpdatedAt());
 
-            List<Long> ids = articleIdsByWork.getOrDefault(work.getId(), Collections.emptyList());
             vo.setKnowledgeCategoryId(work.getKnowledgeCategoryId());
         vo.setKnowledgeCategoryName(knowledgeCategoryNameOf(work.getKnowledgeCategoryId()));
-        vo.setArticleCount(ids.size());
-            vo.setArticleTitles(ids.stream()
-                    .map(finalArticleTitles::get)
-                    .filter(Objects::nonNull)
-                    .toList());
             return vo;
         }).toList();
     }

@@ -293,7 +293,8 @@ class WorkApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "title", "银河系漫游指南（修订版）",
-                                "content", "补充了观测误差说明。")))
+                                "content", "补充了观测误差说明。",
+                                "categoryId", 7)))
                         .header("Authorization", "Bearer " + creatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PENDING"))
@@ -349,6 +350,7 @@ class WorkApiTest {
         String workBody = objectMapper.writeValueAsString(Map.of(
                 "title", "【测试】选错分类",
                 "content", "内容",
+                "categoryId", 7,
                 "knowledgeCategoryId", 7L));
 
         mockMvc.perform(post("/api/v1/creator/works")

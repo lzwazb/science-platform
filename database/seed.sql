@@ -31,7 +31,6 @@ DELETE FROM `content_feedback`;
 DELETE FROM `interaction_favorite`;
 DELETE FROM `interaction_like`;
 DELETE FROM `interaction_comment`;
-DELETE FROM `work_article_relation`;
 DELETE FROM `creator_work`;
 DELETE FROM `knowledge_contribution`;
 DELETE FROM `article_version`;
@@ -317,12 +316,6 @@ INSERT INTO `creator_work` (`id`, `creator_id`, `title`, `description`, `content
  '作品说明：四个格子分别对应 TLS 握手的四个环节，用两个人交换盒子的过程类比。第二格特意画了中间人偷看但拿不到内容，用来解释为什么需要证书。',
  '/images/works/https-comic.svg', 9, 3, 'PENDING', NULL, NULL, NULL, 0, '2026-10-20 20:00:00', '2026-10-20 20:00:00', 0);
 
-INSERT INTO `work_article_relation` (`id`, `work_id`, `article_id`, `created_at`) VALUES
-(1, 1, 1, '2026-08-25 16:05:00'),
-(2, 1, 2, '2026-08-25 16:05:00'),
-(3, 2, 3, '2026-09-04 11:25:00'),
-(4, 3, 7, '2026-09-12 14:35:00'),
-(5, 4, 5, '2026-10-20 20:05:00');
 
 -- =============================================================================
 -- 六、主题活动

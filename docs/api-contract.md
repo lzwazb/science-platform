@@ -412,7 +412,7 @@ GET /api/v1/works/{id}
 | PUT | `/api/v1/creator/works/{id}` | 编辑作品 |
 | POST | `/api/v1/creator/works/{id}/submit` | 提交审核 |
 | DELETE | `/api/v1/creator/works/{id}` | 删除（逻辑删除） |
-| PUT | `/api/v1/creator/works/{id}/articles` | 更新关联文章，body `{"articleIds": [1, 2]}` |
+| PUT | `/api/v1/creator/works/{id}/knowledge-category` | 更新作品所属学科，body `{"knowledgeCategoryId": 1}`；传 null 表示不关联 |
 
 > **路径变更说明**：开发档案 8.3 把「创建作品」写在 `POST /api/v1/works`，这里改为 `/api/v1/creator/works`。
 > 原因是 `/api/v1/works/**` 在安全配置里是公开路径前缀，把写操作混进公开前缀会让授权规则难以表达；
@@ -438,7 +438,7 @@ PUBLISHED ──编辑──> PENDING（自动重新送审）
 | 编辑已发布作品 | 自动变 `PENDING`，从公开列表消失 |
 | 删除被活动投稿引用的作品 | `400 该作品已被 1 个活动投稿引用，不能删除` |
 | 关联未发布的文章 | `400 只能关联已发布的科普文章` |
-| 关联不存在的文章 | `400 部分关联文章不存在` |
+| 所选学科不是知识库分类 | `400 请选择知识库中的学科分类` |
 | 作品分类选了文章分类 | `400 所选分类不是作品分类` |
 
 ### 2.13 作品审核
@@ -448,7 +448,7 @@ PUBLISHED ──编辑──> PENDING（自动重新送审）
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | GET | `/api/v1/review/works` | 作品列表，**默认 `status=PENDING`** |
-| GET | `/api/v1/review/works/{id}` | 审核详情，含作品全文与关联文章 |
+| GET | `/api/v1/review/works/{id}` | 审核详情，含作品全文与所属学科 |
 | POST | `/api/v1/review/works/{id}/approve` | 通过，body `{"comment": "..."}`（意见可空） |
 | POST | `/api/v1/review/works/{id}/reject` | 驳回，body `{"comment": "..."}`（意见必填） |
 | POST | `/api/v1/review/works/{id}/offline` | 下架已发布作品 |

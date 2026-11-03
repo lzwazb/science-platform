@@ -223,9 +223,15 @@ public class WorkService {
         }
     }
 
+    /**
+     * 校验作品形态分类。
+     *
+     * <p>必填：作品到底是图文、海报、漫画还是短视频，是它在广场上被理解的第一层信息，
+     * 留空会让列表卡片出现「无形态」的空标签。</p>
+     */
     private void validateCategory(Long categoryId) {
         if (categoryId == null) {
-            return;
+            throw new BusinessException("请选择作品分类");
         }
         ScienceCategory category = categoryMapper.selectById(categoryId);
         if (category == null) {

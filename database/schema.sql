@@ -35,7 +35,6 @@ DROP TABLE IF EXISTS `content_feedback`;
 DROP TABLE IF EXISTS `interaction_favorite`;
 DROP TABLE IF EXISTS `interaction_like`;
 DROP TABLE IF EXISTS `interaction_comment`;
-DROP TABLE IF EXISTS `work_article_relation`;
 DROP TABLE IF EXISTS `creator_work`;
 DROP TABLE IF EXISTS `knowledge_contribution`;
 DROP TABLE IF EXISTS `article_version`;
@@ -254,18 +253,7 @@ CREATE TABLE `creator_work` (
     CONSTRAINT `fk_work_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `sys_user` (`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '科普创意作品';
 
--- 作品与文章关联（多对多）
-CREATE TABLE `work_article_relation` (
-    `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `work_id`    BIGINT UNSIGNED NOT NULL COMMENT '作品 ID',
-    `article_id` BIGINT UNSIGNED NOT NULL COMMENT '文章 ID',
-    `created_at` DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_work_article` (`work_id`, `article_id`),
-    KEY `idx_article_id` (`article_id`),
-    CONSTRAINT `fk_war_work` FOREIGN KEY (`work_id`) REFERENCES `creator_work` (`id`),
-    CONSTRAINT `fk_war_article` FOREIGN KEY (`article_id`) REFERENCES `science_article` (`id`)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '作品与科普文章关联';
+
 
 -- =============================================================================
 -- 五、社区互动

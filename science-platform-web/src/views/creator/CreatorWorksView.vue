@@ -58,6 +58,7 @@ const rules = {
     { max: 150, message: '标题不能超过 150 个字符', trigger: 'blur' },
   ],
   content: [{ required: true, message: '请输入作品内容或说明', trigger: 'blur' }],
+  categoryId: [{ required: true, message: '请选择作品分类', trigger: 'change' }],
 }
 
 const dialogTitle = computed(() =>
