@@ -9,7 +9,6 @@ import {
   submitWork,
   updateWork,
 } from '@/api/work'
-import { listArticles } from '@/api/article'
 import { listCategories } from '@/api/category'
 import { STATUS_META } from '@/constants/dict'
 
@@ -17,7 +16,7 @@ const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
 const categories = ref([])
-const articleOptions = ref([])
+const knowledgeCategories = ref([])
 
 const filters = reactive({
   page: 1,
@@ -50,7 +49,7 @@ const form = reactive({
   content: '',
   coverUrl: '',
   categoryId: null,
-  articleIds: [],
+  knowledgeCategoryId: null,
 })
 
 const rules = {
@@ -85,15 +84,17 @@ async function fetchRows() {
 
 async function fetchOptions() {
   try {
-    const [cats, articles] = await Promise.all([
+    // 作品形态分类（图文 / 海报 / 漫画 / 短视频）与知识分类（学科）是两套：
+    // 前者是必填的作品形态，后者是选填的学科归属，一起并发取回
+    const [cats, knowledgeCats] = await Promise.all([
       listCategories({ type: 'WORK' }),
-      listArticles({ page: 1, size: 100 }),
+      listCategories({ type: 'ARTICLE' }),
     ])
     categories.value = cats
-    articleOptions.value = articles.records || []
+    knowledgeCategories.value = knowledgeCats || []
   } catch {
     categories.value = []
-    articleOptions.value = []
+    knowledgeCategories.value = []
   }
 }
 
@@ -103,7 +104,7 @@ function resetForm() {
   form.content = ''
   form.coverUrl = ''
   form.categoryId = null
-  form.articleIds = []
+  form.knowledgeCategoryId = null
   editingId.value = null
 }
 
@@ -124,7 +125,7 @@ async function openEdit(row) {
     form.content = detail.content
     form.coverUrl = detail.coverUrl || ''
     form.categoryId = detail.categoryId
-    form.articleIds = (detail.articles || []).map((a) => a.id)
+    form.knowledgeCategoryId = detail.knowledgeCategoryId || null
     dialogVisible.value = true
   } catch {
     // 错误已提示
@@ -144,7 +145,7 @@ async function handleSubmit() {
       content: form.content,
       coverUrl: form.coverUrl.trim(),
       categoryId: form.categoryId,
-      articleIds: form.articleIds,
+      knowledgeCategoryId: form.knowledgeCategoryId,
     }
     if (dialogMode.value === 'create') {
       await createWork(payload)
@@ -256,15 +257,9 @@ onMounted(() => {
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="关联文章" width="120">
+      <el-table-column label="所属学科" width="120">
         <template #default="{ row }">
-          <el-tooltip
-            v-if="row.articleTitles?.length"
-            :content="row.articleTitles.join('、')"
-            placement="top"
-          >
-            <span>{{ row.articleCount }} 篇</span>
-          </el-tooltip>
+          <span v-if="row.knowledgeCategoryName">{{ row.knowledgeCategoryName }}</span>
           <span v-else class="creator-muted">未关联</span>
         </template>
       </el-table-column>
@@ -346,23 +341,24 @@ onMounted(() => {
         <el-form-item label="封面" prop="coverUrl">
           <el-input v-model="form.coverUrl" placeholder="图片地址，例如 /images/works/dna-score.svg" />
         </el-form-item>
-        <el-form-item label="关联文章" prop="articleIds">
+        <el-form-item label="所属学科" prop="knowledgeCategoryId">
           <el-select
-            v-model="form.articleIds"
-            multiple
+            v-model="form.knowledgeCategoryId"
+            clearable
             filterable
-            placeholder="选择要关联的已发布科普文章"
+            placeholder="可选：这件作品属于哪个学科（不选也可以）"
             style="width: 100%"
           >
             <el-option
-              v-for="article in articleOptions"
-              :key="article.id"
-              :label="`[${article.categoryName || '未分类'}] ${article.title}`"
-              :value="article.id"
+              v-for="category in knowledgeCategories"
+              :key="category.id"
+              :label="category.name"
+              :value="category.id"
             />
           </el-select>
           <p class="form-hint">
-            只能关联已发布的科普文章。关联后，文章详情页会展示这件作品。
+            选填。选了学科后，该学科下的读者能在作品广场按分类找到它；
+            不选也不影响发布。
           </p>
         </el-form-item>
         <el-form-item label="作品内容" prop="content">

@@ -3,15 +3,11 @@ package com.science.platform.modules.work.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.science.platform.common.exception.BusinessException;
-import com.science.platform.modules.knowledge.entity.ScienceArticle;
 import com.science.platform.modules.knowledge.entity.ScienceCategory;
-import com.science.platform.modules.knowledge.mapper.ScienceArticleMapper;
 import com.science.platform.modules.knowledge.mapper.ScienceCategoryMapper;
 import com.science.platform.modules.work.dto.WorkSaveRequest;
 import com.science.platform.modules.work.entity.CreatorWork;
-import com.science.platform.modules.work.entity.WorkArticleRelation;
 import com.science.platform.modules.work.mapper.CreatorWorkMapper;
-import com.science.platform.modules.work.mapper.WorkArticleRelationMapper;
 import com.science.platform.modules.work.vo.WorkDetailVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,19 +34,13 @@ public class WorkService {
     public static final String STATUS_OFFLINE = "OFFLINE";
 
     private final CreatorWorkMapper workMapper;
-    private final WorkArticleRelationMapper relationMapper;
-    private final ScienceArticleMapper articleMapper;
     private final ScienceCategoryMapper categoryMapper;
     private final WorkQueryService workQueryService;
 
     public WorkService(CreatorWorkMapper workMapper,
-                       WorkArticleRelationMapper relationMapper,
-                       ScienceArticleMapper articleMapper,
-                       ScienceCategoryMapper categoryMapper,
+                                             ScienceCategoryMapper categoryMapper,
                        WorkQueryService workQueryService) {
         this.workMapper = workMapper;
-        this.relationMapper = relationMapper;
-        this.articleMapper = articleMapper;
         this.categoryMapper = categoryMapper;
         this.workQueryService = workQueryService;
     }
@@ -64,7 +54,7 @@ public class WorkService {
     @Transactional
     public WorkDetailVO create(WorkSaveRequest request, Long creatorId) {
         validateCategory(request.getCategoryId());
-        validateArticles(request.getArticleIds());
+        validateKnowledgeCategory(request.getKnowledgeCategoryId());
 
         CreatorWork work = new CreatorWork();
         work.setCreatorId(creatorId);
@@ -73,14 +63,12 @@ public class WorkService {
         work.setContent(request.getContent());
         work.setCoverUrl(request.getCoverUrl());
         work.setCategoryId(request.getCategoryId());
+        work.setKnowledgeCategoryId(request.getKnowledgeCategoryId());
         work.setStatus(STATUS_DRAFT);
         work.setViewCount(0);
 
         workMapper.insert(work);
 
-        if (request.getArticleIds() != null) {
-            replaceRelations(work.getId(), request.getArticleIds());
-        }
         return workQueryService.getDetailAnyStatus(work.getId());
     }
 
@@ -95,7 +83,7 @@ public class WorkService {
     public WorkDetailVO update(Long id, WorkSaveRequest request, Long operatorId) {
         CreatorWork work = requireOwnedWork(id, operatorId);
         validateCategory(request.getCategoryId());
-        validateArticles(request.getArticleIds());
+        validateKnowledgeCategory(request.getKnowledgeCategoryId());
 
         // 逐列 set，不用 updateById(entity)：
         // 整行回写会把读出来的旧 view_count 一起写回去（覆盖这期间的浏览量），
@@ -116,9 +104,6 @@ public class WorkService {
             updateReviewFields(id, STATUS_PENDING, null, null, null);
         }
 
-        if (request.getArticleIds() != null) {
-            replaceRelations(id, request.getArticleIds());
-        }
         return workQueryService.getDetailAnyStatus(id);
     }
 
@@ -154,24 +139,28 @@ public class WorkService {
             throw new BusinessException("该作品已被 " + submissions + " 个活动投稿引用，不能删除");
         }
 
-        LambdaQueryWrapper<WorkArticleRelation> relWrapper = new LambdaQueryWrapper<>();
-        relWrapper.eq(WorkArticleRelation::getWorkId, id);
-        relationMapper.delete(relWrapper);
+
 
         workMapper.deleteById(id);
     }
 
     /**
-     * 更新作品关联的科普文章（作者本人操作）。
+     * 更新作品所属的知识分类（作者本人操作）。
+     *
+     * <p>传 null 表示不关联任何学科，这是允许的：作品可以先发出来，之后再归类。</p>
      */
     @Transactional
-    public WorkDetailVO updateArticles(Long id, List<Long> articleIds, Long operatorId) {
+    public WorkDetailVO updateKnowledgeCategory(Long id, Long knowledgeCategoryId, Long operatorId) {
         CreatorWork work = requireOwnedWork(id, operatorId);
-        validateArticles(articleIds);
+        validateKnowledgeCategory(knowledgeCategoryId);
 
-        replaceRelations(id, articleIds);
+        LambdaUpdateWrapper<CreatorWork> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(CreatorWork::getId, id)
+                .set(CreatorWork::getKnowledgeCategoryId, knowledgeCategoryId)
+                .set(CreatorWork::getUpdatedAt, LocalDateTime.now());
+        workMapper.update(null, wrapper);
 
-        // 已发布作品改关联同样需要重新送审，保持「公开内容必经过审核」的一致性
+        // 已发布作品改归属同样需要重新送审，保持「公开内容必经过审核」的一致性
         if (STATUS_PUBLISHED.equals(work.getStatus())) {
             updateReviewFields(id, STATUS_PENDING, null, null, null);
         }
@@ -215,42 +204,22 @@ public class WorkService {
         return work;
     }
 
-    private void replaceRelations(Long workId, List<Long> articleIds) {
-        LambdaQueryWrapper<WorkArticleRelation> deleteWrapper = new LambdaQueryWrapper<>();
-        deleteWrapper.eq(WorkArticleRelation::getWorkId, workId);
-        relationMapper.delete(deleteWrapper);
-
-        if (articleIds == null || articleIds.isEmpty()) {
-            return;
-        }
-        for (Long articleId : articleIds.stream().filter(Objects::nonNull).distinct().toList()) {
-            WorkArticleRelation relation = new WorkArticleRelation();
-            relation.setWorkId(workId);
-            relation.setArticleId(articleId);
-            relationMapper.insert(relation);
-        }
-    }
-
     /**
-     * 关联目标必须存在且是已发布文章（开发档案 FR-WK-04：关联目标必须存在且可访问）。
+     * 校验所选的「知识分类」。
+     *
+     * <p>允许为空（作品不归属任何学科）；非空时必须是知识库分类（type = ARTICLE），
+     * 不能拿作品形态分类（图文 / 海报 / 漫画 / 短视频）混进来。</p>
      */
-    private void validateArticles(List<Long> articleIds) {
-        if (articleIds == null || articleIds.isEmpty()) {
+    private void validateKnowledgeCategory(Long knowledgeCategoryId) {
+        if (knowledgeCategoryId == null) {
             return;
         }
-        List<Long> distinctIds = articleIds.stream().filter(Objects::nonNull).distinct().toList();
-        if (distinctIds.isEmpty()) {
-            return;
+        ScienceCategory category = categoryMapper.selectById(knowledgeCategoryId);
+        if (category == null) {
+            throw new BusinessException("所选知识分类不存在");
         }
-
-        List<ScienceArticle> articles = articleMapper.selectBatchIds(distinctIds);
-        if (articles.size() != distinctIds.size()) {
-            throw new BusinessException("部分关联文章不存在");
-        }
-        boolean anyNotPublished = articles.stream()
-                .anyMatch(article -> !STATUS_PUBLISHED.equals(article.getStatus()));
-        if (anyNotPublished) {
-            throw new BusinessException("只能关联已发布的科普文章");
+        if (!"ARTICLE".equals(category.getType())) {
+            throw new BusinessException("请选择知识库中的学科分类");
         }
     }
 

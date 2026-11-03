@@ -233,7 +233,8 @@ CREATE TABLE `creator_work` (
     `description`    VARCHAR(500)             DEFAULT NULL COMMENT '简介',
     `content`        LONGTEXT        NOT NULL COMMENT '正文 / 作品说明',
     `cover_url`      VARCHAR(255)             DEFAULT NULL COMMENT '封面或图片地址',
-    `category_id`    BIGINT UNSIGNED          DEFAULT NULL COMMENT '作品分类 ID',
+    `category_id`    BIGINT UNSIGNED          DEFAULT NULL COMMENT '作品形态分类 ID（科普图文 / 海报 / 漫画 / 短视频）',
+  `knowledge_category_id` BIGINT UNSIGNED   DEFAULT NULL COMMENT '所属知识分类 ID（science_category.type = ARTICLE），NULL 表示未关联',
     `status`         VARCHAR(20)     NOT NULL DEFAULT 'DRAFT' COMMENT '状态：DRAFT/PENDING/PUBLISHED/REJECTED/OFFLINE',
     `reviewer_id`    BIGINT UNSIGNED          DEFAULT NULL COMMENT '审核人 ID',
     `review_comment` VARCHAR(1000)            DEFAULT NULL COMMENT '审核意见',
@@ -246,8 +247,10 @@ CREATE TABLE `creator_work` (
     KEY `idx_status_created` (`status`, `created_at`),
     KEY `idx_creator_id` (`creator_id`),
     KEY `idx_category_id` (`category_id`),
+    KEY `idx_work_knowledge_category` (`knowledge_category_id`),
     CONSTRAINT `fk_work_creator` FOREIGN KEY (`creator_id`) REFERENCES `sys_user` (`id`),
     CONSTRAINT `fk_work_category` FOREIGN KEY (`category_id`) REFERENCES `science_category` (`id`),
+    CONSTRAINT `fk_work_knowledge_category` FOREIGN KEY (`knowledge_category_id`) REFERENCES `science_category` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT `fk_work_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `sys_user` (`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '科普创意作品';
 

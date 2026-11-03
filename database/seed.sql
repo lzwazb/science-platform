@@ -296,26 +296,26 @@ INSERT INTO `article_version` (`id`, `article_id`, `version_no`, `title_snapshot
 -- 五、创意作品
 -- =============================================================================
 
-INSERT INTO `creator_work` (`id`, `creator_id`, `title`, `description`, `content`, `cover_url`, `category_id`, `status`, `reviewer_id`, `review_comment`, `reviewed_at`, `view_count`, `created_at`, `updated_at`, `deleted`) VALUES
+INSERT INTO `creator_work` (`id`, `creator_id`, `title`, `description`, `content`, `cover_url`, `category_id`, `knowledge_category_id`, `status`, `reviewer_id`, `review_comment`, `reviewed_at`, `view_count`, `created_at`, `updated_at`, `deleted`) VALUES
 (1, 4, '银河系漫游指南：一张图看懂我们所在的家',
  '把银盘的尺度、太阳的位置和公转周期画进一张长图，配 6 个数字注解。',
  '作品说明：以横向长图呈现银河系结构，从银心向外依次标注核球、银盘、旋臂、银晕；叠加比例尺，用“光年”和“公转圈数”两个尺度对照说明太阳的位置。每个区域配一句不超过二十字的注解，避免堆砌术语。',
- '/images/works/milky-way-map.svg', 7, 'PUBLISHED', 3, '图示清晰，数字与原文一致，比例尺标注到位。通过。', '2026-09-02 10:20:00', 860, '2026-08-25 16:00:00', '2026-09-02 10:20:00', 0),
+ '/images/works/milky-way-map.svg', 7, 1, 'PUBLISHED', 3, '图示清晰，数字与原文一致，比例尺标注到位。通过。', '2026-09-02 10:20:00', 860, '2026-08-25 16:00:00', '2026-09-02 10:20:00', 0),
 
 (2, 4, '生命密码的乐谱：碱基配对图解',
  '把 A-T、G-C 的配对规则设计成五线谱上的两个声部，用图形强化互补的概念。',
  '作品说明：用乐谱隐喻核酸链——两条链像两个互补的声部，音符一一对应。图中标注四类碱基的氢键数量（A-T 两个，G-C 三个），并在页脚提醒读者：图形是记忆辅助，不代表分子的真实几何形态。',
- '/images/works/dna-score.svg', 7, 'PUBLISHED', 3, '隐喻选用恰当，页脚声明很重要。通过。', '2026-09-10 15:40:00', 540, '2026-09-04 11:20:00', '2026-09-10 15:40:00', 0),
+ '/images/works/dna-score.svg', 7, 2, 'PUBLISHED', 3, '隐喻选用恰当，页脚声明很重要。通过。', '2026-09-10 15:40:00', 540, '2026-09-04 11:20:00', '2026-09-10 15:40:00', 0),
 
 (3, 5, '碳足迹的一天：从早餐到熄灯',
  '用一天 12 个生活场景，估算个人碳排放的相对大小，不追求绝对精确。',
  '作品说明：选取早餐、通勤、办公用电、外卖、洗衣、开空调、充电、熄灯等 12 个场景，用同等体积的方块表示相对排放量。页面顶部明确写出：这是教学用的示意模型，数值为公开统计的粗略换算，不能用于个人碳核算。',
- '/images/works/carbon-day.svg', 7, 'PUBLISHED', 3, '相对量表达清楚，免责说明充分。通过。', '2026-09-18 09:15:00', 1120, '2026-09-12 14:30:00', '2026-09-18 09:15:00', 0),
+ '/images/works/carbon-day.svg', 7, 5, 'PUBLISHED', 3, '相对量表达清楚，免责说明充分。通过。', '2026-09-18 09:15:00', 1120, '2026-09-12 14:30:00', '2026-09-18 09:15:00', 0),
 
 (4, 5, 'HTTPS 小剧场：一次握手的四步',
  '四格漫画，把身份验证、密钥协商、加密传输、完整性校验画成四场戏。',
  '作品说明：四个格子分别对应 TLS 握手的四个环节，用两个人交换盒子的过程类比。第二格特意画了中间人偷看但拿不到内容，用来解释为什么需要证书。',
- '/images/works/https-comic.svg', 9, 'PENDING', NULL, NULL, NULL, 0, '2026-10-20 20:00:00', '2026-10-20 20:00:00', 0);
+ '/images/works/https-comic.svg', 9, 3, 'PENDING', NULL, NULL, NULL, 0, '2026-10-20 20:00:00', '2026-10-20 20:00:00', 0);
 
 INSERT INTO `work_article_relation` (`id`, `work_id`, `article_id`, `created_at`) VALUES
 (1, 1, 1, '2026-08-25 16:05:00'),

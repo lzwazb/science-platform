@@ -32,7 +32,16 @@ public class CreatorWork {
 
     private String coverUrl;
 
+    /** 作品形态分类（科普图文 / 海报 / 漫画 / 短视频） */
     private Long categoryId;
+
+    /**
+     * 所属知识分类（science_category.type = ARTICLE）。
+     *
+     * <p>可为空：作品不强制归入某个学科。与 {@link #categoryId} 的区别是——
+     * 后者描述「这是一件什么形态的作品」，前者描述「它讲的是哪个领域的知识」。</p>
+     */
+    private Long knowledgeCategoryId;
 
     /** DRAFT / PENDING / PUBLISHED / REJECTED / OFFLINE */
     private String status;

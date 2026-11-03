@@ -174,8 +174,8 @@ onMounted(fetchRows)
         </template>
       </el-table-column>
       <el-table-column prop="viewCount" label="浏览" width="80" />
-      <el-table-column label="关联文章" width="96">
-        <template #default="{ row }">{{ row.articleCount ?? 0 }} 篇</template>
+      <el-table-column label="所属学科" width="110">
+        <template #default="{ row }">{{ row.knowledgeCategoryName || '未关联' }}</template>
       </el-table-column>
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }">{{ row.createdAt }}</template>
@@ -228,19 +228,9 @@ onMounted(fetchRows)
             <el-descriptions-item label="审核意见" :span="2">
               {{ detail.reviewComment || '—' }}
             </el-descriptions-item>
-            <el-descriptions-item label="关联文章" :span="2">
-              <template v-if="detail.articles?.length">
-                <el-tag
-                  v-for="article in detail.articles"
-                  :key="article.id"
-                  size="small"
-                  effect="plain"
-                  class="article-tag"
-                >
-                  {{ article.title }}
-                </el-tag>
-              </template>
-              <span v-else>未关联</span>
+            <el-descriptions-item label="所属学科" :span="2">
+              <span v-if="detail.knowledgeCategoryName">{{ detail.knowledgeCategoryName }}</span>
+              <span v-else class="creator-muted">未关联</span>
             </el-descriptions-item>
           </el-descriptions>
         </template>

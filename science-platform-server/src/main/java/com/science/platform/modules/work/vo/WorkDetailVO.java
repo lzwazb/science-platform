@@ -25,6 +25,12 @@ public class WorkDetailVO {
 
     private String categoryName;
 
+    /** 所属知识分类 ID，null 表示未关联 */
+    private Long knowledgeCategoryId;
+
+    /** 所属知识分类名称，用于详情页展示 */
+    private String knowledgeCategoryName;
+
     private Long creatorId;
 
     private String creatorName;

@@ -91,11 +91,11 @@ onMounted(fetchDetail)
       </article>
 
       <section class="work-articles">
-        <h2 class="work-articles__title">这件作品关联的科普文章</h2>
+        <h2 class="work-articles__title">同学科的科普文章</h2>
 
         <el-empty
           v-if="!work.articles?.length"
-          description="作者还没有为这件作品关联科普文章"
+          description="这个学科下暂时还没有已发布的文章"
           :image-size="80"
         />
 

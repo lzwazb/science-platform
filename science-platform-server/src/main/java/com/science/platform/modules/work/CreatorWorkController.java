@@ -2,7 +2,6 @@ package com.science.platform.modules.work;
 
 import com.science.platform.common.ApiResponse;
 import com.science.platform.common.PageResult;
-import com.science.platform.modules.knowledge.dto.TopicArticlesRequest;
 import com.science.platform.modules.work.dto.WorkSaveRequest;
 import com.science.platform.modules.work.service.WorkQueryService;
 import com.science.platform.modules.work.service.WorkService;
@@ -23,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * 创作者中心接口。
@@ -109,12 +110,15 @@ public class CreatorWorkController {
     }
 
     /**
-     * 更新作品关联的科普文章。
+     * 更新作品所属的知识分类。
+     *
+     * <p>传 null 表示不关联任何学科——作品可以先发布，之后再归类。</p>
      */
-    @PutMapping("/{id}/articles")
-    public ApiResponse<WorkDetailVO> updateArticles(@PathVariable Long id,
-                                                    @Valid @RequestBody TopicArticlesRequest request) {
-        return ApiResponse.success("关联文章已更新",
-                workService.updateArticles(id, request.getArticleIds(), SecurityUtils.currentUserId()));
+    @PutMapping("/{id}/knowledge-category")
+    public ApiResponse<WorkDetailVO> updateKnowledgeCategory(@PathVariable Long id,
+                                                            @RequestBody Map<String, Long> body) {
+        return ApiResponse.success("所属分类已更新",
+                workService.updateKnowledgeCategory(id, body.get("knowledgeCategoryId"),
+                        SecurityUtils.currentUserId()));
     }
 }

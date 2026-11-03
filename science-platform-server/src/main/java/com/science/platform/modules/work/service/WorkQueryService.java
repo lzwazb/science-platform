@@ -190,38 +190,51 @@ public class WorkQueryService {
     }
 
     /**
-     * 查询作品关联的文章。
+     * 查询同一知识分类下的其它已发布作品。
+     *
+     * <p>作品不再挂到具体文章上，改为归属学科分类。文章详情页的「相关作品」
+     * 因此改成「同分类作品」：同一领域里，读了文章的人可能也想看别人的再创作。</p>
      */
-    public List<ArticleBriefVO> findArticlesOfWork(Long workId) {
-        LambdaQueryWrapper<WorkArticleRelation> relWrapper = new LambdaQueryWrapper<>();
-        relWrapper.eq(WorkArticleRelation::getWorkId, workId).orderByAsc(WorkArticleRelation::getId);
-        List<WorkArticleRelation> relations = relationMapper.selectList(relWrapper);
-        if (relations.isEmpty()) {
+    public List<ArticleBriefVO> findArticlesByCategory(Long knowledgeCategoryId) {
+        if (knowledgeCategoryId == null) {
             return Collections.emptyList();
         }
-
-        List<Long> articleIds = relations.stream().map(WorkArticleRelation::getArticleId).toList();
-        List<ScienceArticle> articles = articleMapper.selectBatchIds(articleIds);
+        LambdaQueryWrapper<ScienceArticle> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ScienceArticle::getCategoryId, knowledgeCategoryId)
+                .eq(ScienceArticle::getStatus, "PUBLISHED")
+                .eq(ScienceArticle::getDeleted, 0)
+                .orderByDesc(ScienceArticle::getPublishedAt)
+                .last("LIMIT 4");
+        List<ScienceArticle> articles = articleMapper.selectList(wrapper);
         if (articles.isEmpty()) {
             return Collections.emptyList();
         }
-
-        Map<Long, ScienceArticle> byId = articles.stream()
-                .collect(Collectors.toMap(ScienceArticle::getId, a -> a, (a, b) -> a));
         Map<Long, String> categoryNames = categoryNameMap(articles);
+        return articles.stream().map(article -> {
+            ArticleBriefVO vo = new ArticleBriefVO();
+            vo.setId(article.getId());
+            vo.setTitle(article.getTitle());
+            vo.setSummary(article.getSummary());
+            vo.setCoverUrl(article.getCoverUrl());
+            vo.setCategoryName(categoryNames.get(article.getCategoryId()));
+            return vo;
+        }).toList();
+    }
 
-        return articleIds.stream()
-                .map(byId::get)
-                .filter(Objects::nonNull)
-                .map(article -> {
-                    ArticleBriefVO vo = new ArticleBriefVO();
-                    vo.setId(article.getId());
-                    vo.setTitle(article.getTitle());
-                    vo.setSummary(article.getSummary());
-                    vo.setCoverUrl(article.getCoverUrl());
-                    vo.setCategoryName(categoryNames.get(article.getCategoryId()));
-                    return vo;
-                }).toList();
+    /**
+     * 反查：某个知识分类下有哪些已发布作品（文章详情页用）。
+     */
+    public List<WorkListItemVO> listPublishedByKnowledgeCategory(Long knowledgeCategoryId, int limit) {
+        if (knowledgeCategoryId == null) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<CreatorWork> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CreatorWork::getKnowledgeCategoryId, knowledgeCategoryId)
+                .eq(CreatorWork::getStatus, "PUBLISHED")
+                .eq(CreatorWork::getDeleted, 0)
+                .orderByDesc(CreatorWork::getViewCount)
+                .last("LIMIT " + limit);
+        return toListItems(workMapper.selectList(wrapper));
     }
 
     /**
@@ -272,13 +285,24 @@ public class WorkQueryService {
             vo.setUpdatedAt(work.getUpdatedAt());
 
             List<Long> ids = articleIdsByWork.getOrDefault(work.getId(), Collections.emptyList());
-            vo.setArticleCount(ids.size());
+            vo.setKnowledgeCategoryId(work.getKnowledgeCategoryId());
+        vo.setKnowledgeCategoryName(knowledgeCategoryNameOf(work.getKnowledgeCategoryId()));
+        vo.setArticleCount(ids.size());
             vo.setArticleTitles(ids.stream()
                     .map(finalArticleTitles::get)
                     .filter(Objects::nonNull)
                     .toList());
             return vo;
         }).toList();
+    }
+
+    /** 取知识分类名，未关联或已删除时返回 null */
+    private String knowledgeCategoryNameOf(Long knowledgeCategoryId) {
+        if (knowledgeCategoryId == null) {
+            return null;
+        }
+        ScienceCategory category = categoryMapper.selectById(knowledgeCategoryId);
+        return category == null ? null : category.getName();
     }
 
     private WorkDetailVO toDetail(CreatorWork work) {
@@ -306,7 +330,9 @@ public class WorkQueryService {
             vo.setCreatorName(creator.getNickname());
             vo.setCreatorBio(creator.getBio());
         }
-        vo.setArticles(findArticlesOfWork(work.getId()));
+        vo.setKnowledgeCategoryId(work.getKnowledgeCategoryId());
+        vo.setKnowledgeCategoryName(knowledgeCategoryNameOf(work.getKnowledgeCategoryId()));
+        vo.setArticles(findArticlesByCategory(work.getKnowledgeCategoryId()));
         return vo;
     }
 

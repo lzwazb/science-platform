@@ -66,7 +66,7 @@ class WorkApiTest {
                 "description", "测试作品",
                 "content", "测试内容",
                 "categoryId", 7,
-                "articleIds", new long[]{1L}));
+                "knowledgeCategoryId", 1L));
         MvcResult result = mockMvc.perform(post("/api/v1/creator/works")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
@@ -106,17 +106,18 @@ class WorkApiTest {
     }
 
     @Test
-    @DisplayName("作品详情返回关联文章与创作者信息")
+    @DisplayName("作品详情返回所属学科与同分类文章")
     void workDetailContainsRelations() throws Exception {
         mockMvc.perform(get("/api/v1/works/3"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.title").value("碳足迹的一天：从早餐到熄灯"))
                 .andExpect(jsonPath("$.data.creatorName").value("青柠手绘"))
+                .andExpect(jsonPath("$.data.knowledgeCategoryName").value("地球与环境"))
                 .andExpect(jsonPath("$.data.articles[0].title").value("碳循环与碳中和：地球的收支账"));
     }
 
     @Test
-    @DisplayName("文章详情反向展示关联的已发布作品")
+    @DisplayName("文章详情反向展示同分类的已发布作品")
     void articleShowsRelatedWorks() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/articles/7"))
                 .andExpect(status().isOk())
@@ -340,33 +341,39 @@ class WorkApiTest {
     }
 
     @Test
-    @DisplayName("关联文章必须是已发布文章")
-    void cannotLinkUnpublishedArticle() throws Exception {
+    @DisplayName("所属学科必须是知识库分类，不能选作品形态分类")
+    void knowledgeCategoryMustBeArticleType() throws Exception {
         String creatorToken = token("creator01");
 
-        // 先造一篇草稿文章
-        String articleBody = objectMapper.writeValueAsString(Map.of(
-                "title", "【测试】草稿文章",
-                "content", "正文"));
-        MvcResult articleResult = mockMvc.perform(post("/api/v1/admin/articles")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(articleBody)
-                        .header("Authorization", "Bearer " + token("admin01")))
-                .andExpect(status().isOk())
-                .andReturn();
-        long draftArticleId = readJson(articleResult).path("data").path("id").asLong();
-
+        // 7 是「科普图文」，属于 WORK 类型，不是学科
         String workBody = objectMapper.writeValueAsString(Map.of(
-                "title", "【测试】关联草稿文章",
+                "title", "【测试】选错分类",
                 "content", "内容",
-                "articleIds", new long[]{draftArticleId}));
+                "knowledgeCategoryId", 7L));
 
         mockMvc.perform(post("/api/v1/creator/works")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(workBody)
                         .header("Authorization", "Bearer " + creatorToken))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("只能关联已发布的科普文章"));
+                .andExpect(jsonPath("$.message").value("请选择知识库中的学科分类"));
+    }
+
+    @Test
+    @DisplayName("不选学科也能创建作品")
+    void canCreateWorkWithoutKnowledgeCategory() throws Exception {
+        String creatorToken = token("creator01");
+        String body = objectMapper.writeValueAsString(Map.of(
+                "title", "【测试】不关联学科",
+                "content", "内容",
+                "categoryId", 7));
+
+        mockMvc.perform(post("/api/v1/creator/works")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .header("Authorization", "Bearer " + creatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.knowledgeCategoryId").doesNotExist());
     }
 
     @Test
