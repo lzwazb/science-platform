@@ -61,6 +61,11 @@ const rules = {
 
 const dialogTitle = computed(() => (dialogMode.value === 'create' ? '新建文章' : '编辑文章'))
 
+/** 在后台直接预览前台文章页（新标签打开，不打断当前编辑流） */
+function openPreview(row) {
+  window.open(`/knowledge/${row.id}`, '_blank', 'noopener')
+}
+
 async function fetchRows() {
   loading.value = true
   try {
@@ -248,7 +253,14 @@ onMounted(() => {
 
     <el-table v-loading="loading" :data="rows" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="64" />
-      <el-table-column prop="title" label="标题" min-width="240" show-overflow-tooltip />
+      <el-table-column label="标题" min-width="240" show-overflow-tooltip>
+        <template #default="{ row }">
+          <!-- 标题做成链接：直接打开前台文章页，省得复制标题再去搜 -->
+          <el-link type="primary" :underline="false" @click="openPreview(row)">
+            {{ row.title }}
+          </el-link>
+        </template>
+      </el-table-column>
       <el-table-column prop="categoryName" label="分类" width="110">
         <template #default="{ row }">{{ row.categoryName || '未分类' }}</template>
       </el-table-column>

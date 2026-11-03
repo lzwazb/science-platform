@@ -156,13 +156,14 @@ onMounted(() => {
               <template #dropdown>
                 <el-dropdown-menu>
                   <template v-for="(item, index) in workspaceItems" :key="item.to">
-                    <el-dropdown-item
+                    <!-- 分组标题用纯文本，不用 disabled 菜单项：
+                         后者长得像「点不动的菜单项」，容易被当成坏了 -->
+                    <li
                       v-if="item.group && (index === 0 || workspaceItems[index - 1].group !== item.group)"
-                      disabled
                       class="app-menu__group"
                     >
                       {{ item.group }}
-                    </el-dropdown-item>
+                    </li>
                     <el-dropdown-item @click="go(item.to)">{{ item.label }}</el-dropdown-item>
                   </template>
                 </el-dropdown-menu>
@@ -186,9 +187,7 @@ onMounted(() => {
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item disabled class="app-menu__group">
-                    {{ primaryRoleLabel }}
-                  </el-dropdown-item>
+                  <li class="app-menu__group">{{ primaryRoleLabel }}</li>
                   <el-dropdown-item
                     v-for="item in personalItems"
                     :key="item.to"
@@ -568,10 +567,22 @@ onMounted(() => {
 
 /* 下拉菜单内的小组标题 */
 .app-menu__group {
-  font-size: 11px !important;
-  color: var(--sp-text-faint) !important;
+  display: block;
+  padding: 8px 16px 4px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
   letter-spacing: 0.6px;
-  cursor: default !important;
+  color: var(--sp-text-faint);
+  cursor: default;
+  user-select: none;
+  list-style: none;
+}
+
+/* 分组之间加一条细分隔，替代原来「多一个灰项」的做法 */
+.app-menu__group + li:not(.app-menu__group) {
+  margin-top: 0;
 }
 
 .app-menu__badge {

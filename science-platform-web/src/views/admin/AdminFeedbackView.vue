@@ -46,6 +46,12 @@ const handleForm = reactive({
   handleComment: '',
 })
 
+/** 打开反馈指向的内容（新标签，保留后台页面） */
+function openTarget(row) {
+  const path = row.linkType === 'WORK' ? `/works/${row.linkId}` : `/knowledge/${row.linkId}`
+  window.open(path, '_blank', 'noopener')
+}
+
 async function fetchRows() {
   loading.value = true
   try {
@@ -123,7 +129,7 @@ onMounted(fetchRows)
       </el-table-column>
       <el-table-column label="目标" min-width="220" show-overflow-tooltip>
         <template #default="{ row }">
-          <span class="feedback-target">{{ targetLabels[row.targetType] || row.targetType }}：{{ row.targetTitle }}</span>
+          <span class="feedback-target">             {{ targetLabels[row.targetType] || row.targetType }}：             <el-link               v-if="row.linkType && row.linkId"               type="primary"               :underline="false"               @click="openTarget(row)"             >               {{ row.targetTitle }}             </el-link>             <template v-else>{{ row.targetTitle }}</template>           </span>
         </template>
       </el-table-column>
       <el-table-column prop="description" label="反馈说明" min-width="240" show-overflow-tooltip />
@@ -170,7 +176,7 @@ onMounted(fetchRows)
             {{ typeLabels[current.feedbackType] || current.feedbackType }}
           </el-descriptions-item>
           <el-descriptions-item label="目标内容">
-            {{ targetLabels[current.targetType] }}：{{ current.targetTitle }}
+            {{ targetLabels[current.targetType] }}：             <el-link               v-if="current.linkType && current.linkId"               type="primary"               :underline="false"               @click="openTarget(current)"             >               {{ current.targetTitle }}             </el-link>             <template v-else>{{ current.targetTitle }}</template>
           </el-descriptions-item>
           <el-descriptions-item label="提交人">{{ current.userName }}</el-descriptions-item>
           <el-descriptions-item label="反馈说明">{{ current.description }}</el-descriptions-item>

@@ -3,8 +3,6 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { updateMyProfile } from '@/api/user'
 import { getMyOverview } from '@/api/notification'
-import { listMyContributions } from '@/api/contribution'
-import { listMyFavorites } from '@/api/interaction'
 import { listMySubmissions } from '@/api/event'
 import { listMyFeedback } from '@/api/interaction'
 import { listMyWorks } from '@/api/work'
@@ -57,12 +55,10 @@ async function fetchOverview() {
 // ---------------- 各 tab 数据 ----------------
 
 const tabLoading = ref(false)
-const contributions = ref([])
-const favorites = ref([])
 const submissions = ref([])
 const feedbacks = ref([])
 const works = ref([])
-const loaded = reactive({ contribution: false, favorite: false, submission: false, feedback: false, work: false })
+const loaded = reactive({ submission: false, feedback: false, work: false })
 
 const statusMeta = STATUS_META
 
@@ -79,17 +75,17 @@ const typeLabels = {
 
 const awardLabels = { FIRST: '一等奖', SECOND: '二等奖', THIRD: '三等奖', EXCELLENT: '优秀奖' }
 
+/** 打开反馈指向的内容（新标签，不打断当前页） */
+function openTarget(row) {
+  const path = row.linkType === 'WORK' ? `/works/${row.linkId}` : `/knowledge/${row.linkId}`
+  window.open(path, '_blank', 'noopener')
+}
+
 async function loadTab(tab) {
   if (loaded[tab]) return
   tabLoading.value = true
   try {
-    if (tab === 'contribution') {
-      const data = await listMyContributions({ page: 1, size: 20 })
-      contributions.value = data.records || []
-    } else if (tab === 'favorite') {
-      const data = await listMyFavorites({ page: 1, size: 20 })
-      favorites.value = data.records || []
-    } else if (tab === 'submission') {
+    if (tab === 'submission') {
       submissions.value = (await listMySubmissions()) || []
     } else if (tab === 'feedback') {
       const data = await listMyFeedback({ page: 1, size: 20 })
@@ -230,54 +226,7 @@ onMounted(async () => {
       </el-tab-pane>
 
       <!-- 我的贡献 -->
-      <el-tab-pane label="我的贡献" name="contribution">
-        <div v-loading="tabLoading">
-          <el-empty v-if="contributions.length === 0" description="还没有提交过知识贡献" :image-size="70" />
-          <el-table v-else :data="contributions" border size="small">
-            <el-table-column prop="articleTitle" label="目标文章" min-width="200" show-overflow-tooltip />
-            <el-table-column label="类型" width="90">
-              <template #default="{ row }">{{ typeLabels[row.contributionType] || row.contributionType }}</template>
-            </el-table-column>
-            <el-table-column label="状态" width="96">
-              <template #default="{ row }">
-                <el-tag size="small" :type="statusMeta[row.status]?.type || 'info'">
-                  {{ statusMeta[row.status]?.text || row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="审核意见" min-width="180" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span :class="{ 'profile-muted': !row.reviewComment }">{{ row.reviewComment || '—' }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div class="profile-link">
-            <RouterLink to="/contributions/mine">查看全部贡献记录 →</RouterLink>
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <!-- 我的收藏 -->
-      <el-tab-pane label="我的收藏" name="favorite">
-        <div v-loading="tabLoading">
-          <el-empty v-if="favorites.length === 0" description="还没有收藏" :image-size="70" />
-          <el-table v-else :data="favorites" border size="small">
-            <el-table-column label="类型" width="80">
-              <template #default="{ row }">{{ row.targetType === 'WORK' ? '作品' : '文章' }}</template>
-            </el-table-column>
-            <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag v-if="!row.available" size="small" type="info">已下架</el-tag>
-                <span v-else class="profile-muted">可访问</span>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div class="profile-link">
-            <RouterLink to="/favorites">查看全部收藏 →</RouterLink>
-          </div>
-        </div>
-      </el-tab-pane>
+      
 
       <!-- 我的投稿 -->
       <el-tab-pane label="我的投稿" name="submission">
@@ -311,7 +260,20 @@ onMounted(async () => {
             <el-table-column label="类型" width="100">
               <template #default="{ row }">{{ typeLabels[row.feedbackType] || row.feedbackType }}</template>
             </el-table-column>
-            <el-table-column prop="targetTitle" label="目标内容" min-width="180" show-overflow-tooltip />
+            <el-table-column label="目标内容" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <!-- linkType/linkId 由后端给：评论类反馈会回溯到所属文章或作品 -->
+                <el-link
+                  v-if="row.linkType && row.linkId"
+                  type="primary"
+                  :underline="false"
+                  @click="openTarget(row)"
+                >
+                  {{ row.targetTitle }}
+                </el-link>
+                <span v-else>{{ row.targetTitle }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="description" label="反馈说明" min-width="200" show-overflow-tooltip />
             <el-table-column label="状态" width="96">
               <template #default="{ row }">

@@ -38,6 +38,11 @@ const offlineSubmitting = ref(false)
 const offlineTarget = ref(null)
 const offlineComment = ref('')
 
+/** 在后台直接预览前台作品页（新标签打开） */
+function openPreview(row) {
+  window.open(`/works/${row.id}`, '_blank', 'noopener')
+}
+
 async function fetchRows() {
   loading.value = true
   try {
@@ -152,7 +157,14 @@ onMounted(fetchRows)
 
     <el-table v-loading="loading" :data="rows" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="64" />
-      <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
+      <el-table-column label="标题" min-width="220" show-overflow-tooltip>
+        <template #default="{ row }">
+          <!-- 标题做成链接：直接打开前台作品页 -->
+          <el-link type="primary" :underline="false" @click="openPreview(row)">
+            {{ row.title }}
+          </el-link>
+        </template>
+      </el-table-column>
       <el-table-column prop="creatorName" label="作者" width="110" />
       <el-table-column label="状态" width="96">
         <template #default="{ row }">

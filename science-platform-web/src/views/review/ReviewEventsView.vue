@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listAdminEvents, listEventSubmissionsForReview, reviewSubmission } from '@/api/event'
+import { listEvents, listEventSubmissionsForReview, reviewSubmission } from '@/api/event'
 
 const loading = ref(false)
 const eventsLoading = ref(false)
@@ -22,7 +22,10 @@ const currentEvent = computed(() => events.value.find((e) => e.id === selectedEv
 async function fetchEvents() {
   eventsLoading.value = true
   try {
-    events.value = await listAdminEvents()
+    // 用公开的活动列表接口：评审员没有 /admin/events 的权限，
+    // 原来调管理员接口会 403，页面看起来「进去了但用不了」。
+    // 评审真正需要的投稿与打分接口都在 /review 下，评审员是有权限的。
+    events.value = await listEvents()
     if (events.value.length > 0 && !selectedEventId.value) {
       // 默认选第一个可评审的活动（非草稿）
       const candidate = events.value.find((e) => e.status !== 'DRAFT') || events.value[0]

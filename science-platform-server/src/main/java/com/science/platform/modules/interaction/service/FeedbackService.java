@@ -166,6 +166,13 @@ public class FeedbackService {
         vo.setTargetType(feedback.getTargetType());
         vo.setTargetId(feedback.getTargetId());
         vo.setTargetTitle(targetResolver.titleOf(feedback.getTargetType(), feedback.getTargetId()));
+        // 指向评论的反馈回溯到评论所属的文章/作品，前端据此拼可点击地址
+        InteractionTargetResolver.TargetLink link =
+                targetResolver.linkOf(feedback.getTargetType(), feedback.getTargetId());
+        if (link != null) {
+            vo.setLinkType(link.type());
+            vo.setLinkId(link.id());
+        }
         vo.setFeedbackType(feedback.getFeedbackType());
         vo.setDescription(feedback.getDescription());
         vo.setStatus(feedback.getStatus());
