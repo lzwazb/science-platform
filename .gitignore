@@ -52,3 +52,6 @@ ui-*.png
 # 素材检索工具的缓存与过程文件
 .curate-cache.json
 assets/media/candidates.html
+
+# 会话交接文档：含明文凭据，只做本地交接
+docs/开发交接.md
