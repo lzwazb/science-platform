@@ -110,7 +110,7 @@ onMounted(() => {
     <header class="works-hero">
       <div class="works-hero__text">
         <h1>创意作品</h1>
-        <p>创作者把科普知识做成图文、海报、漫画与短视频，每件作品都关联到具体的科普文章。</p>
+        <p>创作者把科普知识做成图文、海报、漫画与短视频；作品可以归入某个学科，也可以先发布、之后再归类。</p>
       </div>
       <RouterLink to="/creator/works" class="works-hero__cta">
         <el-button type="primary" plain>我是创作者</el-button>

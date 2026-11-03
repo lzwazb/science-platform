@@ -154,8 +154,8 @@ onMounted(fetchRows)
       <el-table-column prop="categoryName" label="分类" width="110">
         <template #default="{ row }">{{ row.categoryName || '未分类' }}</template>
       </el-table-column>
-      <el-table-column label="关联文章" width="100">
-        <template #default="{ row }">{{ row.articleCount || 0 }} 篇</template>
+      <el-table-column label="所属学科" width="110">
+        <template #default="{ row }">{{ row.knowledgeCategoryName || '未关联' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
@@ -209,10 +209,10 @@ onMounted(fetchRows)
           </section>
 
           <section class="review-detail__section">
-            <h3>关联科普文章</h3>
+            <h3>同学科的科普文章</h3>
             <el-empty
               v-if="!current.articles?.length"
-              description="未关联文章"
+              description="该作品未归属学科，或该学科下还没有已发布文章"
               :image-size="60"
             />
             <ul v-else class="review-detail__articles">
