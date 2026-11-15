@@ -180,6 +180,26 @@ onMounted(fetchRows)
 </template>
 
 <style scoped>
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 16px;
+}
+
+.admin-toolbar__hint {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--sp-text-muted);
+}
+
+.admin-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .comment-target__type {
   margin-right: 6px;
 }

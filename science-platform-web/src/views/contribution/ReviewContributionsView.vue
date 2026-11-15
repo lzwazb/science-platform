@@ -104,7 +104,6 @@ async function handleApprove() {
     })
     ElMessage.success('已通过，文章已更新并生成历史版本')
     drawerVisible.value = false
-    current.value = null
     fetchRows()
   } catch {
     // 错误已提示
@@ -124,7 +123,6 @@ async function handleReject() {
     await rejectContribution(current.value.id, comment.value.trim())
     ElMessage.success('已驳回，提交者会收到通知')
     drawerVisible.value = false
-    current.value = null
     fetchRows()
   } catch {
     // 错误已提示
@@ -154,8 +152,6 @@ onMounted(fetchRows)
       <el-tag effect="plain" type="warning">核心流程</el-tag>
     </header>
 
-    <div class="rw-body">
-      <section class="rw-list">
     <div class="review-toolbar">
       <el-select v-model="filters.status" style="width: 150px" @change="handleFilterChange">
         <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
@@ -206,10 +202,7 @@ onMounted(fetchRows)
       />
     </div>
 
-      </section>
-
-      <aside class="rw-detail">
-        <el-empty v-if="!current" description="从左侧选择一条知识贡献开始审核" :image-size="72" />
+    <el-dialog v-model="drawerVisible" title="审核知识贡献" width="920px" top="5vh" destroy-on-close>
       <div v-loading="detailLoading">
         <template v-if="current">
           <div class="review-meta">
@@ -288,7 +281,9 @@ onMounted(fetchRows)
         </template>
       </div>
 
+      <template #footer>
         <div class="review-footer">
+          <el-button @click="drawerVisible = false">关闭</el-button>
           <template v-if="canOperate">
             <el-button type="danger" plain :loading="acting" @click="handleReject">驳回</el-button>
             <el-button type="success" :loading="acting" @click="handleApprove">
@@ -296,8 +291,8 @@ onMounted(fetchRows)
             </el-button>
           </template>
         </div>
-      </aside>
-    </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

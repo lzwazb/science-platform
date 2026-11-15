@@ -72,7 +72,6 @@ async function handleSubmit() {
     })
     ElMessage.success('评审已提交')
     dialogVisible.value = false
-    current.value = null
     fetchSubmissions()
   } catch {
     // 错误已提示
@@ -101,8 +100,6 @@ onMounted(fetchEvents)
       <el-tag effect="plain" type="warning">评审工作台</el-tag>
     </header>
 
-    <div class="rw-body">
-      <section class="rw-list">
     <div class="review-toolbar">
       <el-select
         v-model="selectedEventId"
@@ -171,10 +168,7 @@ onMounted(fetchEvents)
       </el-table-column>
     </el-table>
 
-      </section>
-
-      <aside class="rw-detail">
-        <el-empty v-if="!current" description="从左侧选择一件投稿开始评分" :image-size="72" />
+    <el-dialog v-model="dialogVisible" title="投稿评分" width="560px" destroy-on-close>
       <template v-if="current">
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item label="作品">{{ current.workTitle }}</el-descriptions-item>
@@ -203,11 +197,11 @@ onMounted(fetchEvents)
         </p>
       </template>
 
-        <div class="rw-actions">
-          <el-button type="primary" :loading="submitting" @click="handleSubmit">提交评审</el-button>
-        </div>
-      </aside>
-    </div>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmit">提交评审</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

@@ -16,7 +16,7 @@ const stats = reactive({
   ongoingEvents: 0,
 })
 
-/** 卡片：数字 + 说明 + 去处理 */
+/** 卡片：数字 + 说明 + 去处理；整张卡可点，点击直达对应页面 */
 const cards = [
   {
     key: 'contributions',
@@ -45,6 +45,13 @@ const cards = [
     hint: '知识库当前对外可见的文章数',
     path: '/admin/articles',
     tone: 'success',
+  },
+  {
+    key: 'ongoingEvents',
+    label: '进行中的活动',
+    hint: '按起止时间判断，草稿不计入',
+    path: '/admin/events',
+    tone: 'info',
   },
 ]
 
@@ -96,28 +103,7 @@ onMounted(loadCounts)
         <span class="dash-card__hint">{{ card.hint }}</span>
         <span class="dash-card__go">去处理 →</span>
       </RouterLink>
-
-      <div class="dash-card dash-card--info dash-card--plain">
-        <span class="dash-card__label">进行中的活动</span>
-        <strong class="dash-card__value">{{ stats.ongoingEvents }}</strong>
-        <span class="dash-card__hint">按起止时间判断，草稿不计入</span>
-        <RouterLink to="/admin/events" class="dash-card__go">活动管理 →</RouterLink>
-      </div>
     </div>
-
-    <section class="dash-links sp-card">
-      <h2>常用入口</h2>
-      <div class="dash-links__row">
-        <RouterLink to="/admin/articles">文章管理</RouterLink>
-        <RouterLink to="/admin/categories">分类管理</RouterLink>
-        <RouterLink to="/admin/topics">专题管理</RouterLink>
-        <RouterLink to="/admin/works">作品管理</RouterLink>
-        <RouterLink to="/admin/comments">评论管理</RouterLink>
-        <RouterLink to="/admin/events">活动管理</RouterLink>
-        <RouterLink to="/admin/feedback">内容反馈</RouterLink>
-        <RouterLink to="/admin/settings">系统设置</RouterLink>
-      </div>
-    </section>
   </div>
 </template>
 
@@ -126,7 +112,6 @@ onMounted(loadCounts)
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--sp-gap);
-  margin-bottom: var(--sp-gap-lg);
 }
 
 .dash-card {
@@ -175,27 +160,5 @@ onMounted(loadCounts)
   margin-top: auto;
   font-size: 12px;
   color: var(--sp-primary);
-}
-
-.dash-links h2 {
-  margin: 0 0 12px;
-  font-size: 15px;
-  color: var(--sp-text-strong);
-}
-
-.dash-links__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 18px;
-  font-size: 13px;
-}
-
-.dash-links__row a {
-  color: var(--sp-primary);
-  text-decoration: none;
-}
-
-.dash-links__row a:hover {
-  text-decoration: underline;
 }
 </style>

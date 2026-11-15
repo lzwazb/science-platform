@@ -76,7 +76,6 @@ async function handleApprove() {
     await approveWork(current.value.id, comment.value.trim())
     ElMessage.success('已通过审核')
     drawerVisible.value = false
-    current.value = null
     fetchRows()
   } catch {
     // 错误已提示
@@ -96,7 +95,6 @@ async function handleReject() {
     await rejectWork(current.value.id, comment.value.trim())
     ElMessage.success('已驳回')
     drawerVisible.value = false
-    current.value = null
     fetchRows()
   } catch {
     // 错误已提示
@@ -112,7 +110,6 @@ async function handleOffline() {
     await offlineWork(current.value.id, comment.value.trim())
     ElMessage.success('已下架')
     drawerVisible.value = false
-    current.value = null
     fetchRows()
   } catch {
     // 错误已提示
@@ -142,8 +139,6 @@ onMounted(fetchRows)
       <el-tag effect="plain" type="warning">评审工作台</el-tag>
     </header>
 
-    <div class="rw-body">
-      <section class="rw-list">
     <div class="review-toolbar">
       <el-select v-model="filters.status" style="width: 150px" @change="handleFilterChange">
         <el-option v-for="opt in statusOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
@@ -190,10 +185,7 @@ onMounted(fetchRows)
       />
     </div>
 
-      </section>
-
-      <aside class="rw-detail">
-        <el-empty v-if="!current" description="从左侧选择一个作品开始审核" :image-size="72" />
+    <el-dialog v-model="drawerVisible" title="作品审核" width="720px" top="6vh" destroy-on-close>
       <div v-loading="detailLoading">
         <template v-if="current">
           <h2 class="review-detail__title">{{ current.title }}</h2>
@@ -250,7 +242,9 @@ onMounted(fetchRows)
         </template>
       </div>
 
+      <template #footer>
         <div class="review-drawer-footer">
+          <el-button @click="drawerVisible = false">关闭</el-button>
           <template v-if="current">
             <template v-if="current.status === 'PENDING'">
               <el-button type="danger" plain :loading="acting" @click="handleReject">驳回</el-button>
@@ -266,8 +260,8 @@ onMounted(fetchRows)
             </el-button>
           </template>
         </div>
-      </aside>
-    </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
