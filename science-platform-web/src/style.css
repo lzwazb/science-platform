@@ -481,6 +481,12 @@ button:focus-visible,
   padding-top: 10px;
 }
 
+/* 审核弹窗内容较长（原文 + 建议 + 编辑区），让弹窗内部滚动而不是整页滚 */
+.review-dialog .el-dialog__body {
+  max-height: 68vh;
+  overflow-y: auto;
+}
+
 .admin-main .el-dialog .el-form-item {
   margin-bottom: 14px;
 }

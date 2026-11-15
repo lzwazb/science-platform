@@ -185,7 +185,7 @@ onMounted(fetchRows)
       />
     </div>
 
-    <el-dialog v-model="drawerVisible" title="作品审核" width="720px" top="6vh" destroy-on-close>
+    <el-dialog v-model="drawerVisible" title="作品审核" width="720px" top="6vh" class="review-dialog" destroy-on-close>
       <div v-loading="detailLoading">
         <template v-if="current">
           <h2 class="review-detail__title">{{ current.title }}</h2>
