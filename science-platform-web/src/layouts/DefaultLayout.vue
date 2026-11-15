@@ -46,8 +46,17 @@ const workspaceItems = computed(() =>
   buildWorkspaceItems(userStore.roles, userStore.isLoggedIn),
 )
 
-/** 管理员与超管点「工作台」直接进后台布局，不再展开菜单 */
+/** 管理员与超管进后台布局；评审员进审核工作台；其余登录用户只有创作者中心 */
 const isBackendStaff = computed(() => userStore.hasAnyRole(['ADMIN', 'SUPER_ADMIN']))
+const isReviewer = computed(() => userStore.hasAnyRole(['REVIEWER']))
+
+const workbenchPath = computed(() => {
+  if (isBackendStaff.value) return '/admin/dashboard'
+  if (isReviewer.value) return '/workbench/reviews/contributions'
+  return null
+})
+
+const workbenchBase = computed(() => (isBackendStaff.value ? '/admin' : '/workbench'))
 
 /** 个人菜单 */
 const personalItems = computed(() =>
@@ -146,37 +155,23 @@ onMounted(() => {
         <!-- 右侧操作区 -->
         <div class="app-actions">
           <template v-if="userStore.isLoggedIn">
-            <!-- 工作台（按角色出现） -->
-            <!-- 工作台：管理员/超管直接进工作台（后台布局），其他人展开角色菜单 -->
+            <!-- 工作台：管理员进后台布局，评审员进审核工作台，创作者/普通用户直接进创作者中心 -->
             <RouterLink
-              v-if="isBackendStaff"
-              to="/admin/dashboard"
+              v-if="workbenchPath"
+              :to="workbenchPath"
               class="app-actions__workspace"
-              :class="{ 'app-actions__workspace--active': route.path.startsWith('/admin') }"
+              :class="{ 'app-actions__workspace--active': route.path.startsWith(workbenchBase) }"
             >
               工作台
             </RouterLink>
-            <el-dropdown v-else-if="workspaceItems.length" trigger="click" placement="bottom-end">
-              <button type="button" class="app-actions__workspace">
-                工作台
-                <span class="app-actions__caret" />
-              </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <template v-for="(item, index) in workspaceItems" :key="item.to">
-                    <!-- 分组标题用纯文本，不用 disabled 菜单项：
-                         后者长得像「点不动的菜单项」，容易被当成坏了 -->
-                    <li
-                      v-if="item.group && (index === 0 || workspaceItems[index - 1].group !== item.group)"
-                      class="app-menu__group"
-                    >
-                      {{ item.group }}
-                    </li>
-                    <el-dropdown-item @click="go(item.to)">{{ item.label }}</el-dropdown-item>
-                  </template>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <RouterLink
+              v-else
+              to="/creator/works"
+              class="app-actions__workspace"
+              :class="{ 'app-actions__workspace--active': route.path.startsWith('/creator') }"
+            >
+              创作者中心
+            </RouterLink>
 
             <!-- 消息 -->
             <RouterLink to="/notifications" class="app-actions__icon" title="消息">

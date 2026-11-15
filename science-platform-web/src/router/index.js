@@ -227,6 +227,35 @@ const routes = [
     ],
   },
   {
+    path: '/workbench',
+    component: () => import('@/layouts/AdminLayout.vue'),
+    meta: { requiresAuth: true, roles: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
+    children: [
+      {
+        path: '',
+        redirect: '/workbench/reviews/contributions',
+      },
+      {
+        path: 'reviews/contributions',
+        name: 'workbench-reviews-contributions',
+        component: () => import('@/views/contribution/ReviewContributionsView.vue'),
+        meta: { title: '知识贡献审核' },
+      },
+      {
+        path: 'reviews/works',
+        name: 'workbench-reviews-works',
+        component: () => import('@/views/review/ReviewWorksView.vue'),
+        meta: { title: '作品审核' },
+      },
+      {
+        path: 'reviews/events',
+        name: 'workbench-reviews-events',
+        component: () => import('@/views/review/ReviewEventsView.vue'),
+        meta: { title: '活动审核' },
+      },
+    ],
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),

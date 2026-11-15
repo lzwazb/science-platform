@@ -6,6 +6,15 @@ import { useUserStore } from '@/stores/user'
 const route = useRoute()
 const userStore = useUserStore()
 
+/** 管理员用 /admin 前缀，评审员用 /workbench 前缀，菜单路径随之切换 */
+const isBackendStaff = computed(() => userStore.hasAnyRole(['ADMIN', 'SUPER_ADMIN']))
+const workbenchBase = computed(() => (isBackendStaff.value ? '/admin' : '/workbench'))
+
+/** 面包屑「工作台」回首页：管理员回概览，评审员回贡献审核 */
+const workbenchHome = computed(() =>
+  isBackendStaff.value ? '/admin/dashboard' : '/workbench/reviews/contributions',
+)
+
 /**
  * 后台布局：左侧分组菜单 + 右侧内容。
  *
@@ -31,9 +40,9 @@ const menuGroups = computed(() => {
     {
       label: '审核',
       items: [
-        { path: '/admin/reviews/contributions', label: '知识贡献审核', role: ['ADMIN', 'SUPER_ADMIN'] },
-        { path: '/admin/reviews/works', label: '作品审核', role: ['ADMIN', 'SUPER_ADMIN'] },
-        { path: '/admin/reviews/events', label: '活动审核', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: `${workbenchBase.value}/reviews/contributions`, label: '知识贡献审核', role: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
+        { path: `${workbenchBase.value}/reviews/works`, label: '作品审核', role: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
+        { path: `${workbenchBase.value}/reviews/events`, label: '活动审核', role: ['REVIEWER', 'ADMIN', 'SUPER_ADMIN'] },
       ],
     },
     {
@@ -86,13 +95,13 @@ watch(
       @click="sideOpen = !sideOpen"
     >
       <span class="admin-toggle__bars"><i /><i /><i /></span>
-      后台菜单
+      工作台菜单
     </button>
 
     <aside class="admin-side" :class="{ 'admin-side--open': sideOpen }">
       <div class="admin-side__head">
         <span class="admin-side__title">工作台</span>
-        <el-tag size="small" effect="plain" type="warning">{{ userStore.isSuperAdmin ? '超管' : '管理' }}</el-tag>
+        <el-tag size="small" effect="plain" type="warning">{{ userStore.isSuperAdmin ? '超管' : isBackendStaff ? '管理' : '评审' }}</el-tag>
       </div>
 
       <nav class="admin-side__nav">
@@ -118,7 +127,7 @@ watch(
     <section class="admin-main">
       <!-- 面包屑：窄屏侧栏收起后，这里仍能说明「当前在哪个页面」 -->
       <el-breadcrumb separator="/" class="admin-crumb">
-        <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">工作台</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: workbenchHome }">工作台</el-breadcrumb-item>
         <el-breadcrumb-item v-if="route.meta?.title">{{ route.meta.title }}</el-breadcrumb-item>
       </el-breadcrumb>
       <RouterView />
