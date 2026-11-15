@@ -142,7 +142,13 @@ const routes = [
         children: [
           {
             path: '',
-            redirect: '/admin/articles',
+            redirect: '/admin/dashboard',
+          },
+          {
+            path: 'dashboard',
+            name: 'admin-dashboard',
+            component: () => import('@/views/admin/AdminDashboardView.vue'),
+            meta: { title: '概览' },
           },
           {
             path: 'articles',

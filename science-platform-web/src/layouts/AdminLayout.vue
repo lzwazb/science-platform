@@ -15,6 +15,12 @@ const userStore = useUserStore()
 const menuGroups = computed(() => {
   const groups = [
     {
+      label: '总览',
+      items: [
+        { path: '/admin/dashboard', label: '概览', role: ['ADMIN', 'SUPER_ADMIN'] },
+      ],
+    },
+    {
       label: '内容',
       items: [
         { path: '/admin/articles', label: '文章管理', role: ['ADMIN', 'SUPER_ADMIN'] },

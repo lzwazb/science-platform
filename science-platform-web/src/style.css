@@ -457,3 +457,97 @@ button:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   评审工作台：左列表 + 右详情
+   （第三批 3.3：三个审核台共用同一套骨架，窄屏自动回落为上下布局）
+   ========================================================================== */
+
+.rw-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: var(--sp-gap-lg);
+  align-items: start;
+}
+
+.rw-list {
+  min-width: 0;
+}
+
+.rw-detail {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 18px;
+  background: var(--sp-surface);
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius-lg);
+  box-shadow: 0 1px 2px rgba(15, 40, 80, 0.04);
+}
+
+.rw-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--sp-border);
+}
+
+@media (max-width: 1180px) {
+  .rw-body {
+    grid-template-columns: 1fr;
+  }
+
+  .rw-detail {
+    position: static;
+    max-height: none;
+  }
+}
+
+/* 详情列只有 440px：贡献审核的「原文 / 建议」上下叠放，避免两栏各挤一半 */
+.rw-detail .review-compare {
+  grid-template-columns: 1fr;
+}
+
+.rw-detail .review-pane__body {
+  max-height: 200px;
+}
+
+.rw-detail .review-detail__cover img {
+  max-height: 240px;
+  object-fit: contain;
+  background: #f6f9fd;
+}
+
+/* ==========================================================================
+   后台：表格与弹窗的统一观感（第四批）
+   各页仍可局部覆盖，但默认表头、行高与斑马纹不再各写一份。
+   ========================================================================== */
+
+.admin-main .el-table th.el-table__cell {
+  background: #f3f7fc;
+  color: var(--sp-text-strong);
+  font-weight: 600;
+}
+
+.admin-main .el-table .el-table__cell {
+  padding: 9px 0;
+}
+
+.admin-main .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #fafcff;
+}
+
+.admin-main .el-dialog .el-dialog__body {
+  padding-top: 10px;
+}
+
+.admin-main .el-dialog .el-form-item {
+  margin-bottom: 14px;
+}
+
+.admin-main .el-dialog .el-form-item:last-child {
+  margin-bottom: 0;
+}
