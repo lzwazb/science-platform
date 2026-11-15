@@ -7,8 +7,10 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/api/notification'
+import { useNotificationStore } from '@/stores/notification'
 
 const router = useRouter()
+const notificationStore = useNotificationStore()
 
 const loading = ref(false)
 const rows = ref([])
@@ -49,6 +51,7 @@ async function handleRead(item) {
   try {
     await markNotificationRead(item.id)
     item.read = true
+    notificationStore.consumeOne()
   } catch {
     // 错误已提示
   }
@@ -65,6 +68,7 @@ async function handleReadAll() {
   try {
     await markAllNotificationsRead()
     ElMessage.success('已全部标记为已读')
+    notificationStore.reset()
     fetchRows()
   } catch {
     // 错误已提示

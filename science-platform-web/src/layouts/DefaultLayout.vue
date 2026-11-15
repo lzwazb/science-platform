@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getUnreadCount } from '@/api/notification'
+import { useNotificationStore } from '@/stores/notification'
 import { useSiteStore } from '@/stores/site'
 import {
   PRIMARY_NAV,
@@ -54,20 +54,16 @@ const personalItems = computed(() =>
 /** 移动端抽屉 */
 const drawerVisible = ref(false)
 
-/** 未读消息数 */
-const unreadCount = ref(0)
+/** 未读消息数（与消息页共享同一份状态，标记已读后红点立即变化） */
+const notificationStore = useNotificationStore()
+const unreadCount = computed(() => notificationStore.unreadCount)
 
-async function refreshUnread() {
+function refreshUnread() {
   if (!userStore.isLoggedIn) {
-    unreadCount.value = 0
+    notificationStore.reset()
     return
   }
-  try {
-    const data = await getUnreadCount()
-    unreadCount.value = data.unreadCount || 0
-  } catch {
-    unreadCount.value = 0
-  }
+  notificationStore.refresh()
 }
 
 /** 路由变化时刷新未读数（读完消息返回就能看到数字减少） */
@@ -107,7 +103,7 @@ async function handleLogout() {
   }
   drawerVisible.value = false
   userStore.logout()
-  unreadCount.value = 0
+  notificationStore.reset()
   router.push('/')
 }
 
