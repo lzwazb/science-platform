@@ -83,7 +83,7 @@ watch(
 
     <aside class="admin-side" :class="{ 'admin-side--open': sideOpen }">
       <div class="admin-side__head">
-        <span class="admin-side__title">后台管理</span>
+        <span class="admin-side__title">工作台</span>
         <el-tag size="small" effect="plain" type="warning">{{ userStore.isSuperAdmin ? '超管' : '管理' }}</el-tag>
       </div>
 
@@ -110,7 +110,7 @@ watch(
     <section class="admin-main">
       <!-- 面包屑：窄屏侧栏收起后，这里仍能说明「当前在哪个页面」 -->
       <el-breadcrumb separator="/" class="admin-crumb">
-        <el-breadcrumb-item :to="{ path: '/admin/articles' }">后台管理</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">工作台</el-breadcrumb-item>
         <el-breadcrumb-item v-if="route.meta?.title">{{ route.meta.title }}</el-breadcrumb-item>
       </el-breadcrumb>
       <RouterView />

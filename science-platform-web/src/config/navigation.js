@@ -46,7 +46,10 @@ function hasAnyRole(roles, list) {
 export function buildWorkspaceItems(roles, isLoggedIn) {
   if (!isLoggedIn) return []
 
-  const items = [{ to: '/creator/works', label: '创作者中心' }]
+  const isBackendStaff = hasAnyRole(roles, [ROLES.ADMIN, ROLES.SUPER_ADMIN])
+
+  // 管理员与超管直接在后台编辑内容，不再需要「创作者中心」这个入口
+  const items = isBackendStaff ? [] : [{ to: '/creator/works', label: '创作者中心' }]
 
   if (hasAnyRole(roles, [ROLES.REVIEWER, ROLES.ADMIN, ROLES.SUPER_ADMIN])) {
     items.push(
@@ -57,7 +60,7 @@ export function buildWorkspaceItems(roles, isLoggedIn) {
   }
 
   if (hasAnyRole(roles, [ROLES.ADMIN, ROLES.SUPER_ADMIN])) {
-    items.push({ to: '/admin', label: '后台管理' })
+    items.push({ to: '/admin', label: '工作台' })
   }
 
   return items

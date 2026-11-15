@@ -46,6 +46,9 @@ const workspaceItems = computed(() =>
   buildWorkspaceItems(userStore.roles, userStore.isLoggedIn),
 )
 
+/** 管理员与超管点「工作台」直接进后台布局，不再展开菜单 */
+const isBackendStaff = computed(() => userStore.hasAnyRole(['ADMIN', 'SUPER_ADMIN']))
+
 /** 个人菜单 */
 const personalItems = computed(() =>
   buildPersonalItems(userStore.isLoggedIn, unreadCount.value),
@@ -144,7 +147,16 @@ onMounted(() => {
         <div class="app-actions">
           <template v-if="userStore.isLoggedIn">
             <!-- 工作台（按角色出现） -->
-            <el-dropdown v-if="workspaceItems.length" trigger="click" placement="bottom-end">
+            <!-- 工作台：管理员/超管直接进工作台（后台布局），其他人展开角色菜单 -->
+            <RouterLink
+              v-if="isBackendStaff"
+              to="/admin/dashboard"
+              class="app-actions__workspace"
+              :class="{ 'app-actions__workspace--active': route.path.startsWith('/admin') }"
+            >
+              工作台
+            </RouterLink>
+            <el-dropdown v-else-if="workspaceItems.length" trigger="click" placement="bottom-end">
               <button type="button" class="app-actions__workspace">
                 工作台
                 <span class="app-actions__caret" />
@@ -449,6 +461,7 @@ onMounted(() => {
   font-size: 13px;
   color: var(--sp-text);
   cursor: pointer;
+  text-decoration: none;
   transition:
     border-color var(--sp-transition),
     color var(--sp-transition);
@@ -457,6 +470,12 @@ onMounted(() => {
 .app-actions__workspace:hover {
   border-color: var(--sp-primary-light);
   color: var(--sp-primary-dark);
+}
+
+.app-actions__workspace--active {
+  border-color: var(--sp-primary);
+  color: var(--sp-primary-dark);
+  background: #f3f8ff;
 }
 
 .app-actions__caret {
