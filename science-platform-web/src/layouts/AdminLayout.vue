@@ -29,6 +29,14 @@ const menuGroups = computed(() => {
       ],
     },
     {
+      label: '审核',
+      items: [
+        { path: '/admin/reviews/contributions', label: '知识贡献审核', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/reviews/works', label: '作品审核', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/reviews/events', label: '活动审核', role: ['ADMIN', 'SUPER_ADMIN'] },
+      ],
+    },
+    {
       label: '运营',
       items: [
         { path: '/admin/works', label: '作品管理', role: ['ADMIN', 'SUPER_ADMIN'] },

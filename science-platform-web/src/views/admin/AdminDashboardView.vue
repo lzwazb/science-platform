@@ -22,14 +22,14 @@ const cards = [
     key: 'contributions',
     label: '待审知识贡献',
     hint: '通过后会更新文章并生成历史版本',
-    path: '/review/contributions',
+    path: '/admin/reviews/contributions',
     tone: 'primary',
   },
   {
     key: 'works',
     label: '待审作品',
     hint: '通过后才会出现在作品广场',
-    path: '/review/works',
+    path: '/admin/reviews/works',
     tone: 'warning',
   },
   {

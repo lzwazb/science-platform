@@ -151,6 +151,24 @@ const routes = [
             meta: { title: '概览' },
           },
           {
+            path: 'reviews/contributions',
+            name: 'admin-reviews-contributions',
+            component: () => import('@/views/contribution/ReviewContributionsView.vue'),
+            meta: { title: '知识贡献审核' },
+          },
+          {
+            path: 'reviews/works',
+            name: 'admin-reviews-works',
+            component: () => import('@/views/review/ReviewWorksView.vue'),
+            meta: { title: '作品审核' },
+          },
+          {
+            path: 'reviews/events',
+            name: 'admin-reviews-events',
+            component: () => import('@/views/review/ReviewEventsView.vue'),
+            meta: { title: '活动审核' },
+          },
+          {
             path: 'articles',
             name: 'admin-articles',
             component: () => import('@/views/admin/AdminArticleView.vue'),
