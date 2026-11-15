@@ -33,6 +33,11 @@ public class WorkController {
 
     /**
      * 分页查询已发布作品。
+     *
+     * @param categoryId          作品形态分类（WORK 类型），如科普图文
+     * @param knowledgeCategoryId 所属学科（ARTICLE 类型），用于「同学科作品」下钻
+     * @param creatorId           作者 ID，用于作品详情页的「他的其它作品」
+     * @param keyword             关键词，匹配标题或简介
      */
     @GetMapping
     public ApiResponse<PageResult<WorkListItemVO>> list(
@@ -40,10 +45,13 @@ public class WorkController {
             @RequestParam(defaultValue = "12") @Min(value = 1, message = "每页条数不能小于 1")
             @Max(value = 100, message = "每页条数不能超过 100") long size,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long knowledgeCategoryId,
+            @RequestParam(required = false) Long creatorId,
             @RequestParam(required = false) String keyword) {
 
         return ApiResponse.success(PageResult.of(
-                workQueryService.pagePublished(page, size, categoryId, keyword)));
+                workQueryService.pagePublished(
+                        page, size, categoryId, knowledgeCategoryId, creatorId, keyword)));
     }
 
     /**

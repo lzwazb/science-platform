@@ -134,6 +134,7 @@ npm run dev
 | `/admin/topics` | 后台专题管理与文章编排 | 管理员及以上 |
 | `/admin/events` | 后台活动管理：发布、结束、确认优秀作品 | 管理员及以上 |
 | `/admin/feedback` | 内容反馈处理 | 管理员及以上 |
+| `/admin/comments` | 评论管理：跨内容检索、删除违规评论（含已删除记录） | 管理员及以上 |
 | `/admin/users` | 用户与角色管理 | 超级管理员 |
 | `/admin/settings` | 系统设置：平台信息与系统公告 | 超级管理员 |
 | `/admin/works` | 作品管理：跨状态查看与下架违规内容 | 管理员及以上 |
@@ -177,10 +178,10 @@ npm run build
 
 对照开发档案 12.1「功能验收清单」的 **20 条全部通过**，详见 [验收报告](docs/验收报告.md)。
 
-自动化测试共 **140 个用例**，覆盖档案 12.2 的 T01–T12 全部场景：
+自动化测试共 **146 个用例**，覆盖档案 12.2 的 T01–T12 全部场景：
 
 ```
-Tests run: 140, Failures: 0, Errors: 0
+Tests run: 146, Failures: 0, Errors: 0
 BUILD SUCCESS
 ```
 
@@ -190,9 +191,10 @@ BUILD SUCCESS
 | `ArticlePaginationTest` | 5 | 数据库连通、分页生效、逻辑删除过滤 |
 | `KnowledgeApiTest` | 13 | T04 搜索分页、草稿不可见、后台权限 |
 | `WorkApiTest` | 18 | T05 作品归属、审核状态流转、活动引用保护 |
-| `ContributionApiTest` | 13 | T06 提交校验、T07 驳回、T08 通过并生成版本 |
+| `ContributionApiTest` | 14 | T06 提交校验、T07 驳回、T08 通过并生成版本、通过必须填意见 |
 | `ContributionTransactionTest` | 2 | **T09 事务回滚**（mock 写快照失败验证整体回滚） |
 | `InteractionApiTest` | 13 | **T10 重复点赞**、评论权限、反馈处理 |
+| `AdminCommentApiTest` | 4 | 后台评论检索、跨内容查看、删除后前台不可见、评审员越权拦截（第三轮） |
 | `EventApiTest` | 21 | **T11 活动时间校验**、评审 upsert、未评审不得获奖 |
 | `NotificationApiTest` | 14 | **T12 消息隔离**、防锁死规则、禁用后令牌失效 |
 | `SystemSettingsApiTest` | 12 | 系统设置权限边界、公告全生命周期（第二轮） |
@@ -221,7 +223,7 @@ BUILD SUCCESS
 | --- | --- |
 | 源码 | 后端 130+ Java 文件、前端 40+ Vue/JS 文件 |
 | 数据库 | `database/schema.sql`（22 张表）、`database/seed.sql`（演示数据） |
-| 测试 | 14 个测试类、140 个用例 |
+| 测试 | 15 个测试类、146 个用例 |
 | 文档 | 环境记录、接口约定、数据库设计、数据字典、需求分析、认证设计、验收报告、答辩演示脚本、截图清单、开发日志 |
 
 ## 安全提示
@@ -248,7 +250,7 @@ BUILD SUCCESS
 | 文档 | 用途 |
 | --- | --- |
 | [环境核验记录](docs/environment.md) | 本机版本、端口、依赖源可达性与处理方式 |
-| [接口约定](docs/api-contract.md) | 全部 75 个接口的请求/响应、错误结构、业务规则实测 |
+| [接口约定](docs/api-contract.md) | 全部 77 个接口的请求/响应、错误结构、业务规则实测 |
 | [数据库设计](docs/数据库设计/README.md) | ER 图、关键关系、设计决策取舍（论文材料） |
 | [数据字典](docs/数据库设计/数据字典.md) | 22 张表逐字段说明（论文材料） |
 | [需求分析](docs/thesis/需求分析.md) | 背景、可行性、角色权限、功能需求、用例（论文材料） |

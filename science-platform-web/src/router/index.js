@@ -169,6 +169,12 @@ const routes = [
             meta: { title: '内容反馈' },
           },
           {
+            path: 'comments',
+            name: 'admin-comments',
+            component: () => import('@/views/admin/AdminCommentView.vue'),
+            meta: { title: '评论管理' },
+          },
+          {
             path: 'events',
             name: 'admin-events',
             component: () => import('@/views/admin/AdminEventView.vue'),

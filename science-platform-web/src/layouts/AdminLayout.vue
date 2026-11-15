@@ -28,6 +28,7 @@ const menuGroups = computed(() => {
         { path: '/admin/works', label: '作品管理', role: ['ADMIN', 'SUPER_ADMIN'] },
         { path: '/admin/events', label: '活动管理', role: ['ADMIN', 'SUPER_ADMIN'] },
         { path: '/admin/feedback', label: '内容反馈', role: ['ADMIN', 'SUPER_ADMIN'] },
+        { path: '/admin/comments', label: '评论管理', role: ['ADMIN', 'SUPER_ADMIN'] },
       ],
     },
     {

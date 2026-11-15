@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listWorks } from '@/api/work'
 import { listCategories } from '@/api/category'
+import ContentCard from '@/components/content/ContentCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,12 @@ const total = ref(0)
 const keyword = ref(typeof route.query.keyword === 'string' ? route.query.keyword : '')
 const searchInput = ref(keyword.value)
 const activeCategoryId = ref(route.query.categoryId ? Number(route.query.categoryId) : null)
+/** 学科筛选：从作品详情页的学科标签跳进来时带上 */
+const activeKnowledgeId = ref(
+  route.query.knowledgeCategoryId ? Number(route.query.knowledgeCategoryId) : null,
+)
+/** 作者筛选：从作品详情页的「查看全部」跳进来时带上 */
+const activeCreatorId = ref(route.query.creatorId ? Number(route.query.creatorId) : null)
 const page = ref(route.query.page ? Number(route.query.page) : 1)
 const size = ref(9)
 
@@ -23,6 +30,19 @@ const activeCategoryName = computed(() => {
   if (!activeCategoryId.value) return '全部'
   return categories.value.find((c) => c.id === activeCategoryId.value)?.name || '全部'
 })
+
+/** 学科名与作者名不在分类接口里，从当前结果里回读，避免多一次请求 */
+const activeKnowledgeName = computed(
+  () =>
+    works.value.find((item) => item.knowledgeCategoryId === activeKnowledgeId.value)
+      ?.knowledgeCategoryName || '该学科',
+)
+
+const activeCreatorName = computed(
+  () => works.value.find((item) => item.creatorId === activeCreatorId.value)?.creatorName || '该作者',
+)
+
+const hasExtraFilter = computed(() => Boolean(activeKnowledgeId.value || activeCreatorId.value))
 
 async function fetchWorks() {
   loading.value = true
@@ -32,6 +52,8 @@ async function fetchWorks() {
       page: page.value,
       size: size.value,
       categoryId: activeCategoryId.value || undefined,
+      knowledgeCategoryId: activeKnowledgeId.value || undefined,
+      creatorId: activeCreatorId.value || undefined,
       keyword: keyword.value || undefined,
     })
     works.value = data.records || []
@@ -57,8 +79,19 @@ function syncQuery() {
   const query = {}
   if (keyword.value) query.keyword = keyword.value
   if (activeCategoryId.value) query.categoryId = String(activeCategoryId.value)
+  if (activeKnowledgeId.value) query.knowledgeCategoryId = String(activeKnowledgeId.value)
+  if (activeCreatorId.value) query.creatorId = String(activeCreatorId.value)
   if (page.value > 1) query.page = String(page.value)
   router.replace({ path: '/works', query })
+}
+
+/** 清掉学科/作者筛选，回到作品广场的全部作品 */
+function clearExtraFilters() {
+  activeKnowledgeId.value = null
+  activeCreatorId.value = null
+  page.value = 1
+  syncQuery()
+  fetchWorks()
 }
 
 function applyFilters() {
@@ -88,11 +121,21 @@ watch(
     const q = route.query
     const nextKeyword = typeof q.keyword === 'string' ? q.keyword : ''
     const nextCategory = q.categoryId ? Number(q.categoryId) : null
+    const nextKnowledge = q.knowledgeCategoryId ? Number(q.knowledgeCategoryId) : null
+    const nextCreator = q.creatorId ? Number(q.creatorId) : null
     const nextPage = q.page ? Number(q.page) : 1
-    if (nextKeyword !== keyword.value || nextCategory !== activeCategoryId.value || nextPage !== page.value) {
+    if (
+      nextKeyword !== keyword.value ||
+      nextCategory !== activeCategoryId.value ||
+      nextKnowledge !== activeKnowledgeId.value ||
+      nextCreator !== activeCreatorId.value ||
+      nextPage !== page.value
+    ) {
       keyword.value = nextKeyword
       searchInput.value = nextKeyword
       activeCategoryId.value = nextCategory
+      activeKnowledgeId.value = nextKnowledge
+      activeCreatorId.value = nextCreator
       page.value = nextPage
       fetchWorks()
     }
@@ -153,7 +196,18 @@ onMounted(() => {
     </section>
 
     <section class="works-result-bar">
-      <span>共 <strong>{{ total }}</strong> 件作品 · {{ activeCategoryName }}</span>
+      <span>
+        共 <strong>{{ total }}</strong> 件作品<template v-if="activeCategoryName !== '全部'">
+          · {{ activeCategoryName }}</template
+        >
+      </span>
+      <div v-if="hasExtraFilter" class="works-result-bar__filters">
+        <span v-if="activeKnowledgeId" class="works-filter-chip">
+          学科：{{ activeKnowledgeName }}
+        </span>
+        <span v-if="activeCreatorId" class="works-filter-chip">作者：{{ activeCreatorName }}</span>
+        <el-button link type="primary" @click="clearExtraFilters">清空筛选</el-button>
+      </div>
     </section>
 
     <div v-loading="loading">
@@ -171,26 +225,18 @@ onMounted(() => {
       />
 
       <div v-else class="works-grid">
-        <RouterLink v-for="work in works" :key="work.id" :to="`/works/${work.id}`" class="work-card">
-          <div class="work-card__cover">
-            <img v-if="work.coverUrl" :src="work.coverUrl" :alt="work.title" loading="lazy" />
-            <div v-else class="work-card__cover-fallback">{{ work.title.charAt(0) }}</div>
-          </div>
-          <div class="work-card__body">
-            <div class="work-card__meta">
-              <el-tag size="small" effect="plain" type="primary">{{ work.categoryName || '未分类' }}</el-tag>
-              <span v-if="work.articleCount" class="work-card__link-count">
-                关联 {{ work.articleCount }} 篇文章
-              </span>
-            </div>
-            <h3 class="work-card__title">{{ work.title }}</h3>
-            <p class="work-card__desc">{{ work.description }}</p>
-            <div class="work-card__footer">
-              <span>{{ work.creatorName }}</span>
-              <span>浏览 {{ work.viewCount }}</span>
-            </div>
-          </div>
-        </RouterLink>
+        <ContentCard
+          v-for="work in works"
+          :key="work.id"
+          :to="`/works/${work.id}`"
+          :cover="work.coverUrl || ''"
+          :title="work.title"
+          :summary="work.description"
+          :tag="work.categoryName || '未分类'"
+          :category="work.knowledgeCategoryName"
+          :left="work.creatorName"
+          :right="`浏览 ${work.viewCount}`"
+        />
       </div>
     </div>
 
@@ -268,9 +314,28 @@ onMounted(() => {
 }
 
 .works-result-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin: 18px 0 14px;
   font-size: 13px;
   color: var(--sp-text-muted);
+}
+
+.works-result-bar__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.works-filter-chip {
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: var(--sp-primary-soft);
+  color: var(--sp-primary-dark);
+  font-size: 11.5px;
 }
 
 .works-grid {
@@ -281,115 +346,24 @@ onMounted(() => {
 }
 
 @media (max-width: 1280px) {
-  .work-grid {
+  .works-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 900px) {
-  .work-grid {
+  .works-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 560px) {
-  .work-grid {
+  .works-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.work-card {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--sp-border);
-  border-radius: 14px;
-  background: #fff;
-  overflow: hidden;
-  text-decoration: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
-}
-
-.work-card:hover {
-  border-color: var(--sp-primary-a50);
-  box-shadow: 0 10px 24px var(--sp-primary-a12);
-  transform: translateY(-2px);
-}
-
-.work-card__cover {
-  aspect-ratio: 16 / 9;
-  background: var(--sp-primary-soft);
-  overflow: hidden;
-}
-
-.work-card__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.work-card__cover-fallback {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--sp-primary-dark);
-}
-
-.work-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px 16px;
-  flex: 1;
-}
-
-.work-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.work-card__link-count {
-  font-size: 12px;
-  color: var(--sp-primary-dark);
-}
-
-.work-card__title {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--sp-text-strong);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.work-card__desc {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  flex: 1;
-}
-
-.work-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--sp-text-faint);
-  padding-top: 8px;
-  border-top: 1px dashed var(--sp-border);
-}
+/* 卡片本体统一由 ContentCard 提供，这里只保留网格与分页 */
 
 .works-pagination {
   display: flex;

@@ -23,6 +23,13 @@ export function listEventAwards(id) {
   return request.get(`/events/${id}/awards`)
 }
 
+/**
+ * 活动的公开参赛作品（不含评审得分）。
+ */
+export function listEventSubmissions(id) {
+  return request.get(`/events/${id}/submissions`)
+}
+
 // ---------------- 创作者 ----------------
 
 /**

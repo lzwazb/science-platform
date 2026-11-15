@@ -24,6 +24,9 @@ public class SubmissionListItemVO {
 
     private String workDescription;
 
+    /** 作品所属学科名，公开参赛作品列表用它取学科主题色 */
+    private String knowledgeCategoryName;
+
     private Long submitterId;
 
     private String submitterName;

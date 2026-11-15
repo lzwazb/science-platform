@@ -125,8 +125,12 @@ public class ContributionReviewService {
             throw BusinessException.notFound("目标文章已被删除，无法更新");
         }
 
-        // ---- 3. 确定最终采用的正文 ----
+        // ---- 3. 审核意见与最终采用的正文 ----
+        // 需求 FR-KC-03：审核必须留下意见，通过也不例外，便于提交者理解采纳依据
         String comment = StringUtils.hasText(request.getComment()) ? request.getComment().trim() : null;
+        if (comment == null) {
+            throw new BusinessException("通过时必须填写审核意见");
+        }
         String finalContent = StringUtils.hasText(request.getFinalContent())
                 ? request.getFinalContent()
                 : contribution.getSuggestedContent();

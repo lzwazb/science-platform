@@ -10,6 +10,8 @@ import com.science.platform.modules.event.mapper.EventReviewMapper;
 import com.science.platform.modules.event.mapper.EventSubmissionMapper;
 import com.science.platform.modules.event.vo.AwardVO;
 import com.science.platform.modules.event.vo.SubmissionListItemVO;
+import com.science.platform.modules.knowledge.entity.ScienceCategory;
+import com.science.platform.modules.knowledge.mapper.ScienceCategoryMapper;
 import com.science.platform.modules.user.entity.SysUser;
 import com.science.platform.modules.user.mapper.SysUserMapper;
 import com.science.platform.modules.work.entity.CreatorWork;
@@ -40,17 +42,20 @@ public class EventSubmissionService {
     private final CreativeEventMapper eventMapper;
     private final CreatorWorkMapper workMapper;
     private final SysUserMapper sysUserMapper;
+    private final ScienceCategoryMapper categoryMapper;
 
     public EventSubmissionService(EventSubmissionMapper submissionMapper,
                                   EventReviewMapper reviewMapper,
                                   CreativeEventMapper eventMapper,
                                   CreatorWorkMapper workMapper,
-                                  SysUserMapper sysUserMapper) {
+                                  SysUserMapper sysUserMapper,
+                                  ScienceCategoryMapper categoryMapper) {
         this.submissionMapper = submissionMapper;
         this.reviewMapper = reviewMapper;
         this.eventMapper = eventMapper;
         this.workMapper = workMapper;
         this.sysUserMapper = sysUserMapper;
+        this.categoryMapper = categoryMapper;
     }
 
     /**
@@ -139,6 +144,22 @@ public class EventSubmissionService {
     }
 
     /**
+     * 某活动的公开参赛作品列表。
+     *
+     * <p>与评审列表的区别：清空评审得分、评审人数与「我已评」标记，
+     * 公开页面只展示作品、投稿人、投稿时间与状态。</p>
+     */
+    public List<SubmissionListItemVO> listForPublic(Long eventId) {
+        List<SubmissionListItemVO> items = listForReview(eventId, null);
+        items.forEach(item -> {
+            item.setAverageScore(null);
+            item.setReviewCount(0L);
+            item.setReviewedByMe(false);
+        });
+        return items;
+    }
+
+    /**
      * 统计某活动的投稿数。
      */
     public long countByEvent(Long eventId) {
@@ -215,6 +236,7 @@ public class EventSubmissionService {
         Set<Long> reviewedByMe = reviewerId == null
                 ? Collections.emptySet()
                 : reviewedSubmissionIds(reviewerId, submissionIds);
+        Map<Long, String> knowledgeNames = knowledgeCategoryNamesOf(works);
 
         return submissions.stream().map(submission -> {
             SubmissionListItemVO vo = new SubmissionListItemVO();
@@ -236,9 +258,25 @@ public class EventSubmissionService {
                 vo.setWorkTitle(work.getTitle());
                 vo.setWorkCover(work.getCoverUrl());
                 vo.setWorkDescription(work.getDescription());
+                vo.setKnowledgeCategoryName(knowledgeNames.get(work.getKnowledgeCategoryId()));
             }
             return vo;
         }).toList();
+    }
+
+    /**
+     * 批量取作品所属学科名，用于公开列表的学科主题色。
+     */
+    private Map<Long, String> knowledgeCategoryNamesOf(Map<Long, CreatorWork> works) {
+        Set<Long> categoryIds = works.values().stream()
+                .map(CreatorWork::getKnowledgeCategoryId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (categoryIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return categoryMapper.selectBatchIds(categoryIds).stream()
+                .collect(Collectors.toMap(ScienceCategory::getId, ScienceCategory::getName, (a, b) -> a));
     }
 
     private Map<Long, CreatorWork> worksOf(List<EventSubmission> submissions) {

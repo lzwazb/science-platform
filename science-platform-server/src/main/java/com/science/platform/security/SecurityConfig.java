@@ -69,8 +69,12 @@ public class SecurityConfig {
                         // 预检请求直接放行，否则浏览器拿不到 CORS 响应头
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        // 我的投稿属于个人数据，不能被 /events/** 的公开规则放行，必须写在前面
-                        .requestMatchers(HttpMethod.GET, "/api/v1/events/*/submissions/**").authenticated()
+                        // 我的投稿属于个人数据，不能被 /events/** 的公开规则放行，必须写在前面。
+                        // 只收窄到这两个「mine」路径：活动的公开参赛作品列表
+                        // （GET /events/{id}/submissions）应当对游客可见。
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/events/*/submissions/mine",
+                                "/api/v1/events/submissions/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_ENDPOINTS).permitAll()
                         // 账号与角色管理只对超级管理员开放
                         .requestMatchers("/api/v1/admin/users/**").hasRole("SUPER_ADMIN")

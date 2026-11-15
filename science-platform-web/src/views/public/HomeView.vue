@@ -6,7 +6,8 @@ import { useSiteStore } from '@/stores/site'
 import { listArticles } from '@/api/article'
 import { listWorks } from '@/api/work'
 import { listEvents } from '@/api/event'
-import { TIME_STATUS, themeOf } from '@/constants/dict'
+import ContentCard from '@/components/content/ContentCard.vue'
+import { TIME_STATUS } from '@/constants/dict'
 
 /**
  * 首页：平台身份 + 数据概览 + 知识共建流程 + 最新内容 + 模块入口。
@@ -178,29 +179,20 @@ onMounted(() => {
       </div>
 
       <div v-loading="contentLoading" class="article-grid">
-        <RouterLink
+        <ContentCard
           v-for="article in articles"
           :key="article.id"
           :to="`/knowledge/${article.id}`"
-          class="article-card"
-          :style="{ '--cat': themeOf(article.categoryName).color }"
+          :cover="article.coverUrl || ''"
+          :title="article.title"
+          :summary="article.summary"
+          :category="article.categoryName"
+          :meta-right="`${article.viewCount} 次阅读`"
         >
-          <div class="article-card__cover">
-            <img v-if="article.coverUrl" :src="article.coverUrl" :alt="article.title" loading="lazy" />
-            <div v-else class="cover-fallback">{{ article.title.charAt(0) }}</div>
-            <span v-if="article.versionNo > 1" class="article-card__version">
-              第 {{ article.versionNo }} 版
-            </span>
-          </div>
-          <div class="article-card__body">
-            <div class="article-card__meta">
-              <span class="article-card__category">{{ article.categoryName }}</span>
-              <span>{{ article.viewCount }} 次阅读</span>
-            </div>
-            <h3>{{ article.title }}</h3>
-            <p>{{ article.summary }}</p>
-          </div>
-        </RouterLink>
+          <template v-if="article.versionNo > 1" #badge>
+            <span class="card-version">第 {{ article.versionNo }} 版</span>
+          </template>
+        </ContentCard>
 
         <el-empty
           v-if="!contentLoading && articles.length === 0"
@@ -222,24 +214,18 @@ onMounted(() => {
       </div>
 
       <div v-loading="contentLoading" class="work-grid">
-        <RouterLink
+        <ContentCard
           v-for="work in works"
           :key="work.id"
           :to="`/works/${work.id}`"
-          class="work-card"
-        >
-          <div class="work-card__cover">
-            <img v-if="work.coverUrl" :src="work.coverUrl" :alt="work.title" loading="lazy" />
-            <div v-else class="cover-fallback">{{ work.title.charAt(0) }}</div>
-          </div>
-          <div class="work-card__body">
-            <h3>{{ work.title }}</h3>
-            <div class="work-card__meta">
-              <span>{{ work.creatorName }}</span>
-              <span>关联 {{ work.articleCount }} 篇文章</span>
-            </div>
-          </div>
-        </RouterLink>
+          :cover="work.coverUrl || ''"
+          :title="work.title"
+          :summary="work.description"
+          :tag="work.categoryName"
+          :category="work.knowledgeCategoryName"
+          :left="work.creatorName"
+          :right="work.viewCount ? `浏览 ${work.viewCount}` : ''"
+        />
 
         <el-empty
           v-if="!contentLoading && works.length === 0"
@@ -648,57 +634,20 @@ onMounted(() => {
   font-size: 14px;
 }
 
-/* ---------- 文章卡片 ---------- */
+/* ---------- 内容卡片 ---------- */
+/* 卡片本体（封面 16:9、学科色标签、hover 手感）统一由 ContentCard 提供，
+   首页只决定网格列数，以及封面右上角的版本角标。 */
 
 .article-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* 门户展示位固定三列：卡片比知识库更大，一屏看全六条 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   min-height: 60px;
 }
 
-.article-card {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--sp-border);
-  border-radius: 12px;
-  background: #fff;
-  overflow: hidden;
-  text-decoration: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
-}
-
-.article-card:hover {
-  border-color: var(--sp-primary-a50);
-  box-shadow: 0 8px 22px var(--sp-primary-a10);
-  transform: translateY(-2px);
-}
-
-.article-card__cover {
-  position: relative;
-  aspect-ratio: 16 / 7;
-  background: var(--sp-primary-soft);
-  overflow: hidden;
-}
-
-.article-card__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.cover-fallback {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--sp-primary-dark);
-}
-
-.article-card__version {
+/* 版本角标：只出现在被纠错更新过的文章上 */
+.card-version {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -709,56 +658,6 @@ onMounted(() => {
   font-size: 11px;
 }
 
-.article-card__body {
-  padding: 14px 16px 16px;
-}
-
-.article-card__meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  font-size: 11px;
-  color: var(--sp-text-faint);
-}
-
-.article-card__category {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  color: var(--cat, var(--sp-primary-dark));
-}
-
-/* 学科色竖线，与知识库列表页同一套做法 */
-.article-card__category::before {
-  content: '';
-  width: 3px;
-  height: 11px;
-  border-radius: 2px;
-  background: var(--cat, var(--sp-primary));
-}
-
-.article-card__body h3 {
-  margin: 0 0 8px;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--sp-text-strong);
-}
-
-.article-card__body p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.75;
-  color: var(--sp-text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .grid-empty {
   grid-column: 1 / -1;
 }
@@ -767,53 +666,23 @@ onMounted(() => {
 
 .work-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
   min-height: 60px;
 }
 
-.work-card {
-  border: 1px solid var(--sp-border);
-  border-radius: 12px;
-  background: #fff;
-  overflow: hidden;
-  text-decoration: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+@media (max-width: 1100px) {
+  .article-grid,
+  .work-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.work-card:hover {
-  border-color: var(--sp-primary-a50);
-  box-shadow: 0 8px 20px var(--sp-primary-a10);
-}
-
-.work-card__cover {
-  aspect-ratio: 16 / 9;
-  background: var(--sp-primary-soft);
-  overflow: hidden;
-}
-
-.work-card__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.work-card__body {
-  padding: 12px 14px 14px;
-}
-
-.work-card__body h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-  color: var(--sp-text-strong);
-}
-
-.work-card__meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--sp-text-faint);
+@media (max-width: 640px) {
+  .article-grid,
+  .work-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ---------- 活动 ---------- */

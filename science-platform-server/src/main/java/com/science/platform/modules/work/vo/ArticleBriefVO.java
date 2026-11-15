@@ -17,4 +17,9 @@ public class ArticleBriefVO {
     private String coverUrl;
 
     private String categoryName;
+
+    /** 作者昵称，作品详情页的卡片要按知识库列表的样式展示「作者 + 阅读数」 */
+    private String authorName;
+
+    private Integer viewCount;
 }

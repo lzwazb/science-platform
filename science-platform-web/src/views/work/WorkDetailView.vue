@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getWorkDetail } from '@/api/work'
+import { getWorkDetail, listWorks } from '@/api/work'
 import InteractionBar from '@/components/InteractionBar.vue'
 import CommentSection from '@/components/CommentSection.vue'
+import ContentCard from '@/components/content/ContentCard.vue'
+import { themeOf } from '@/constants/dict'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,20 +13,63 @@ const router = useRouter()
 const loading = ref(false)
 const loadError = ref('')
 const work = ref(null)
+/** 同一作者的其它作品，最多取 3 件做入口 */
+const otherWorks = ref([])
 
 const workId = computed(() => route.params.id)
+
+/** 学科主题色：知识分类决定色，没有归类的作品回落品牌蓝 */
+const catColor = computed(() => themeOf(work.value?.knowledgeCategoryName).color)
 
 const paragraphs = computed(() => {
   if (!work.value?.content) return []
   return work.value.content.split(/\n+/).filter((p) => p.trim().length > 0)
 })
 
+/** 学科标签点击后跳到按学科筛选的作品列表 */
+const sameCategoryWorksLink = computed(() => {
+  const id = work.value?.knowledgeCategoryId
+  return id
+    ? { path: '/works', query: { knowledgeCategoryId: String(id) } }
+    : { path: '/works' }
+})
+
+/** 「查看全部」：该学科下的科普文章 */
+const sameCategoryArticlesLink = computed(() => {
+  const id = work.value?.knowledgeCategoryId
+  return id ? { path: '/knowledge', query: { categoryId: String(id) } } : { path: '/knowledge' }
+})
+
+/** 「查看全部」：该作者的全部作品 */
+const creatorWorksLink = computed(() => {
+  const id = work.value?.creatorId
+  return id ? { path: '/works', query: { creatorId: String(id) } } : { path: '/works' }
+})
+
+async function fetchOtherWorks(creatorId, currentId) {
+  if (!creatorId) {
+    otherWorks.value = []
+    return
+  }
+  try {
+    const data = await listWorks({ page: 1, size: 6, creatorId })
+    otherWorks.value = (data.records || [])
+      .filter((item) => String(item.id) !== String(currentId))
+      .slice(0, 3)
+  } catch {
+    otherWorks.value = []
+  }
+}
+
 async function fetchDetail() {
   loading.value = true
   loadError.value = ''
   work.value = null
+  otherWorks.value = []
   try {
-    work.value = await getWorkDetail(workId.value)
+    const detail = await getWorkDetail(workId.value)
+    work.value = detail
+    fetchOtherWorks(detail.creatorId, detail.id)
   } catch (error) {
     loadError.value = error?.response?.data?.message || '作品加载失败'
   } finally {
@@ -37,7 +82,7 @@ onMounted(fetchDetail)
 </script>
 
 <template>
-  <div class="work-page" v-loading="loading">
+  <div class="work-page" v-loading="loading" :style="{ '--cat': catColor }">
     <el-breadcrumb separator="/" class="work-crumb">
       <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
       <el-breadcrumb-item :to="{ path: '/works' }">创意作品</el-breadcrumb-item>
@@ -59,10 +104,19 @@ onMounted(fetchDetail)
       <article class="work-shell">
         <header class="work-head">
           <div class="work-head__meta">
-            <el-tag size="small" effect="plain" type="primary">{{ work.categoryName || '未分类' }}</el-tag>
+            <RouterLink
+              v-if="work.knowledgeCategoryName"
+              :to="sameCategoryWorksLink"
+              class="work-head__cat"
+              :title="`查看「${work.knowledgeCategoryName}」学科的全部作品`"
+            >
+              {{ work.knowledgeCategoryName }}
+            </RouterLink>
+            <span v-if="work.categoryName" class="work-head__form">{{ work.categoryName }}</span>
             <span>浏览 {{ work.viewCount }}</span>
             <span>{{ (work.reviewedAt || work.createdAt || '').slice(0, 10) }}</span>
           </div>
+
           <h1 class="work-head__title">{{ work.title }}</h1>
           <p v-if="work.description" class="work-head__desc">{{ work.description }}</p>
         </header>
@@ -77,11 +131,26 @@ onMounted(fetchDetail)
 
         <footer class="work-foot">
           <div class="work-author">
-            <el-avatar :size="40">{{ (work.creatorName || '?').charAt(0) }}</el-avatar>
+            <el-avatar :size="42">{{ (work.creatorName || '?').charAt(0) }}</el-avatar>
             <div class="work-author__text">
               <strong>{{ work.creatorName }}</strong>
               <p>{{ work.creatorBio || '这位创作者还没有填写简介' }}</p>
             </div>
+          </div>
+
+          <div v-if="otherWorks.length" class="work-author__more">
+            <span class="work-author__more-label">他的其它作品</span>
+            <RouterLink
+              v-for="item in otherWorks"
+              :key="item.id"
+              :to="`/works/${item.id}`"
+              class="work-author__more-item"
+            >
+              {{ item.title }}
+            </RouterLink>
+            <RouterLink :to="creatorWorksLink" class="work-author__more-all">
+              查看全部 →
+            </RouterLink>
           </div>
 
           <InteractionBar target-type="WORK" :target-id="work.id" class="work-interaction" />
@@ -90,31 +159,36 @@ onMounted(fetchDetail)
         <CommentSection target-type="WORK" :target-id="work.id" />
       </article>
 
-      <section class="work-articles">
-        <h2 class="work-articles__title">同学科的科普文章</h2>
+      <section class="work-related">
+        <div class="work-related__head">
+          <h2>同学科的科普文章</h2>
+          <RouterLink v-if="work.knowledgeCategoryId" :to="sameCategoryArticlesLink" class="work-related__all">
+            全部{{ work.knowledgeCategoryName }}文章 →
+          </RouterLink>
+        </div>
 
         <el-empty
           v-if="!work.articles?.length"
-          description="这个学科下暂时还没有已发布的文章"
+          :description="
+            work.knowledgeCategoryName
+              ? `这个学科下暂时还没有已发布的文章`
+              : '这件作品还没有归入学科，所以没有可推荐的科普文章'
+          "
           :image-size="80"
         />
 
-        <div v-else class="work-articles__list">
-          <RouterLink
+        <div v-else class="work-related__grid">
+          <ContentCard
             v-for="article in work.articles"
             :key="article.id"
             :to="`/knowledge/${article.id}`"
-            class="work-article-card"
-          >
-            <div v-if="article.coverUrl" class="work-article-card__cover">
-              <img :src="article.coverUrl" :alt="article.title" loading="lazy" />
-            </div>
-            <div class="work-article-card__body">
-              <el-tag size="small" effect="plain" type="primary">{{ article.categoryName || '未分类' }}</el-tag>
-              <h3>{{ article.title }}</h3>
-              <p>{{ article.summary }}</p>
-            </div>
-          </RouterLink>
+            :cover="article.coverUrl"
+            :title="article.title"
+            :summary="article.summary"
+            :category="article.categoryName"
+            :left="article.authorName"
+            :right="article.viewCount ? `阅读 ${article.viewCount}` : ''"
+          />
         </div>
       </section>
     </template>
@@ -126,6 +200,8 @@ onMounted(fetchDetail)
   max-width: var(--sp-container-reading);
   margin: 0 auto;
   padding: 24px 24px 56px;
+  /* 学科主题色由模板上的 :style 注入 */
+  --cat: var(--sp-primary);
 }
 
 .work-crumb {
@@ -134,10 +210,21 @@ onMounted(fetchDetail)
 }
 
 .work-shell {
+  position: relative;
+  overflow: hidden;
   background: #fff;
   border: 1px solid var(--sp-border);
   border-radius: 16px;
-  padding: 30px 34px 24px;
+  padding: 32px 36px 26px;
+}
+
+/* 顶部学科色指示线，与文章详情同一手法：进门就知道这是哪一类内容 */
+.work-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cat), transparent 72%);
 }
 
 .work-head__meta {
@@ -149,17 +236,52 @@ onMounted(fetchDetail)
   color: var(--sp-text-faint);
 }
 
+/* 学科是这页的主身份，做成可点的学科色标签；作品形态退为中性小字 */
+.work-head__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--cat);
+  text-decoration: none;
+}
+
+.work-head__cat::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--cat);
+}
+
+.work-head__cat:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.work-head__form {
+  padding: 1px 8px;
+  border: 1px solid var(--sp-border);
+  border-radius: 10px;
+  font-size: 11.5px;
+  color: var(--sp-text-muted);
+  background: #fafcff;
+}
+
 .work-head__title {
-  margin: 14px 0 10px;
-  font-size: 25px;
+  margin: 14px 0 12px;
+  font-size: 27px;
   line-height: 1.45;
+  letter-spacing: 0.3px;
   color: var(--sp-text-strong);
 }
 
 .work-head__desc {
   margin: 0 0 8px;
   padding: 12px 16px;
-  border-left: 3px solid var(--sp-primary);
+  border-left: 3px solid var(--cat);
   background: var(--sp-primary-soft);
   border-radius: 0 8px 8px 0;
   font-size: 13px;
@@ -180,11 +302,11 @@ onMounted(fetchDetail)
 }
 
 .work-body {
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .work-body p {
-  margin: 0 0 15px;
+  margin: 0 0 16px;
   font-size: 15px;
   line-height: 1.95;
   color: var(--sp-text);
@@ -192,8 +314,8 @@ onMounted(fetchDetail)
 }
 
 .work-foot {
-  margin-top: 26px;
-  padding-top: 18px;
+  margin-top: 28px;
+  padding-top: 20px;
   border-top: 1px dashed var(--sp-border);
 }
 
@@ -217,84 +339,108 @@ onMounted(fetchDetail)
   color: var(--sp-text-muted);
 }
 
+.work-author__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-left: 54px;
+}
+
+.work-author__more-label {
+  font-size: 12px;
+  color: var(--sp-text-faint);
+}
+
+.work-author__more-item {
+  max-width: 220px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 3px 11px;
+  border-radius: 12px;
+  background: var(--sp-primary-soft);
+  font-size: 12px;
+  color: var(--sp-primary-dark);
+  text-decoration: none;
+}
+
+.work-author__more-item:hover {
+  background: var(--sp-primary-a22);
+}
+
+.work-author__more-all {
+  font-size: 12px;
+  color: var(--sp-primary);
+  text-decoration: none;
+}
+
+.work-author__more-all:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .work-interaction {
   margin-top: 16px;
 }
 
-.work-articles {
-  margin-top: 26px;
+.work-related {
+  margin-top: 28px;
 }
 
-.work-articles__title {
-  margin: 0 0 12px;
+.work-related__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.work-related__head h2 {
+  margin: 0;
   font-size: 17px;
   color: var(--sp-text-strong);
 }
 
-.work-articles__list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.work-article-card {
-  display: flex;
-  gap: 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--sp-border);
-  border-radius: 12px;
-  background: #fff;
+.work-related__all {
+  font-size: 12.5px;
+  color: var(--sp-primary);
   text-decoration: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.work-article-card:hover {
-  border-color: var(--sp-primary-a50);
-  box-shadow: 0 8px 20px var(--sp-primary-a10);
+.work-related__all:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.work-article-card__cover {
-  flex-shrink: 0;
-  width: 120px;
-  border-radius: 8px;
-  overflow: hidden;
+.work-related__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.work-article-card__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.work-article-card__body h3 {
-  margin: 8px 0 6px;
-  font-size: 15px;
-  color: var(--sp-text-strong);
-}
-
-.work-article-card__body p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--sp-text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+@media (max-width: 900px) {
+  .work-related__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
   .work-shell {
-    padding: 22px 20px 20px;
+    padding: 24px 20px 22px;
   }
 
   .work-head__title {
-    font-size: 21px;
+    font-size: 22px;
   }
 
-  .work-article-card__cover {
-    display: none;
+  .work-author__more {
+    padding-left: 0;
+  }
+
+  .work-related__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

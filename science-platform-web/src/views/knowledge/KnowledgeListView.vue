@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { listArticles } from '@/api/article'
 import { listCategories } from '@/api/category'
-import { themeOf } from '@/constants/dict'
+import ContentCard from '@/components/content/ContentCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,10 +93,6 @@ function handlePageChange(newPage) {
   syncQuery()
   fetchArticles()
   window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function coverOf(article) {
-  return article.coverUrl || ''
 }
 
 watch(
@@ -195,30 +191,18 @@ onMounted(() => {
       />
 
       <div v-else class="kb-grid">
-        <RouterLink
+        <ContentCard
           v-for="article in articles"
           :key="article.id"
           :to="`/knowledge/${article.id}`"
-          class="kb-card"
-          :style="{ '--cat': themeOf(article.categoryName).color }"
-        >
-          <div class="kb-card__cover">
-            <img v-if="coverOf(article)" :src="coverOf(article)" :alt="article.title" loading="lazy" />
-            <div v-else class="kb-card__cover-fallback">{{ article.title.charAt(0) }}</div>
-          </div>
-          <div class="kb-card__body">
-            <div class="kb-card__meta">
-              <span class="kb-card__cat">{{ article.categoryName || '未分类' }}</span>
-              <span class="kb-card__date">{{ (article.publishedAt || '').slice(0, 10) }}</span>
-            </div>
-            <h3 class="kb-card__title">{{ article.title }}</h3>
-            <p class="kb-card__summary">{{ article.summary }}</p>
-            <div class="kb-card__footer">
-              <span>{{ article.authorName }}</span>
-              <span>阅读 {{ article.viewCount }}</span>
-            </div>
-          </div>
-        </RouterLink>
+          :cover="article.coverUrl || ''"
+          :title="article.title"
+          :summary="article.summary"
+          :category="article.categoryName"
+          :meta-right="(article.publishedAt || '').slice(0, 10)"
+          :left="article.authorName"
+          :right="`阅读 ${article.viewCount}`"
+        />
       </div>
     </div>
 
@@ -339,158 +323,8 @@ onMounted(() => {
   }
 }
 
-/* --------------------------------------------------------------------------
-   文章卡片
-   每张卡片带一个 --cat 变量（学科主题色），卡片本身不设边框，
-   靠封面和留白建立层级；hover 时封面上浮一层同色柔光。
-   -------------------------------------------------------------------------- */
-
-.kb-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: 14px;
-  background: #fff;
-  text-decoration: none;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(24, 44, 68, 0.05);
-  /* 纯阴影在浅色底上会显得悬浮，补一条几乎看不见的边框把卡片压住 */
-  border: 1px solid rgba(24, 44, 68, 0.06);
-  transition: box-shadow 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
-}
-
-.kb-card:hover {
-  box-shadow: 0 14px 30px -8px rgba(24, 44, 68, 0.18);
-  border-color: rgba(24, 44, 68, 0.10);
-  transform: translateY(-3px);
-}
-
-.kb-card__cover {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  background: var(--sp-primary-soft);
-  overflow: hidden;
-}
-
-.kb-card__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.kb-card:hover .kb-card__cover img {
-  transform: scale(1.045);
-}
-
-/* 学科色极淡叠色：让同类文章的封面成组，同时不抢照片本身 */
-.kb-card__cover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--cat, var(--sp-primary));
-  opacity: 0;
-  mix-blend-mode: soft-light;
-  transition: opacity 0.22s ease;
-  pointer-events: none;
-}
-
-.kb-card:hover .kb-card__cover::after {
-  opacity: 0.35;
-}
-
-.kb-card__cover-fallback {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--cat, var(--sp-primary-dark));
-}
-
-.kb-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 13px 15px 14px;
-  flex: 1;
-}
-
-.kb-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-/* 分类不再是统一蓝色的 tag，而是学科自己的颜色 + 一条竖线，更轻也更可辨 */
-.kb-card__cat {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  color: var(--cat, var(--sp-primary-dark));
-}
-
-.kb-card__cat::before {
-  content: '';
-  width: 3px;
-  height: 11px;
-  border-radius: 2px;
-  background: var(--cat, var(--sp-primary));
-}
-
-.kb-card__date {
-  font-size: 11.5px;
-  color: var(--sp-text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.kb-card__title {
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 700;
-  line-height: 1.55;
-  letter-spacing: -0.1px;
-  color: var(--sp-text-strong);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  transition: color 0.18s ease;
-  /* 两行截断时让两行长度接近，避免出现「第一行塞满、第二行只剩一个字」
-     的孤字（如「…长期记 / 忆」）。不支持的浏览器会忽略这行，退回普通换行。 */
-  text-wrap: balance;
-}
-
-.kb-card:hover .kb-card__title {
-  color: var(--cat, var(--sp-primary-dark));
-}
-
-.kb-card__summary {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.65;
-  color: var(--sp-text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  flex: 1;
-}
-
-.kb-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11.5px;
-  color: var(--sp-text-faint);
-  padding-top: 9px;
-  border-top: 1px solid var(--sp-border);
-}
+/* 卡片本体（封面比例、学科色标签、hover 手感）统一由 ContentCard 提供，
+   这里只保留网格与分页；样式细化请改 components/content/ContentCard.vue */
 
 .kb-pagination {
   display: flex;

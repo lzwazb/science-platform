@@ -106,4 +106,16 @@ public class EventController {
         eventService.requirePublicEvent(id);
         return ApiResponse.success(submissionService.listAwards(id));
     }
+
+    /**
+     * 活动的公开参赛作品列表。
+     *
+     * <p>只暴露作品信息、投稿人与投稿时间；评审得分与评审人数属于评审工作台的数据，
+     * 不在公开接口里返回（{@code averageScore} / {@code reviewCount} 会被清空）。</p>
+     */
+    @GetMapping("/{id}/submissions")
+    public ApiResponse<List<SubmissionListItemVO>> submissions(@PathVariable Long id) {
+        eventService.requirePublicEvent(id);
+        return ApiResponse.success(submissionService.listForPublic(id));
+    }
 }

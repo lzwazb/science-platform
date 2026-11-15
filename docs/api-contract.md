@@ -385,15 +385,27 @@ GET /api/v1/topics/{id}   # 详情，含按 sort_order 排列的文章
 ### 2.11 作品公开接口
 
 ```
-GET /api/v1/works?page=1&size=12&categoryId=&keyword=
+GET /api/v1/works?page=1&size=12&categoryId=&knowledgeCategoryId=&creatorId=&keyword=
 GET /api/v1/works/{id}
 ```
 
 无需认证。**只返回 `status = PUBLISHED` 的作品**——草稿、待审核、已驳回、已下架的作品在列表和详情中一律不可见。
 
-作品详情返回创作者昵称与简介、以及关联的科普文章列表（`articles`），体现「知识与作品关联」这一项目特色。
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `categoryId` | Long | 作品形态筛选（`WORK` 类型分类：科普图文 / 海报 / 漫画 / 短视频） |
+| `knowledgeCategoryId` | Long | 学科筛选（`ARTICLE` 类型分类）；作品详情的学科标签据此下钻 |
+| `creatorId` | Long | 作者筛选；作品详情的「他的其它作品 / 查看全部」据此下钻 |
+| `keyword` | String | 匹配标题或简介 |
 
-**反向关联**：`GET /api/v1/articles/{id}` 的响应里有 `works` 字段，返回该文章关联的已发布作品。实测文章 7 返回「碳足迹的一天：从早餐到熄灯」。
+> `knowledgeCategoryId` 与 `creatorId` 于第二批前端重构时新增（前端需要「点学科看同学科作品」
+> 和「看该作者全部作品」两个入口）。两者都是可选参数，不传时行为与之前完全一致。
+
+作品详情返回创作者昵称与简介、以及 `articles` 字段：**同学科的已发布文章**（不是手工关联——
+`work_article_relation` 已删除，该字段由 `knowledge_category_id` 实时查得，最多 4 篇）。
+每条含 `id`、`title`、`summary`、`coverUrl`、`categoryName`、`authorName`、`viewCount`。
+
+**反向关联**：`GET /api/v1/articles/{id}` 的响应里有 `works` 字段，返回同学科的已发布作品。
 
 ### 2.12 创作者中心
 
@@ -487,7 +499,7 @@ PUBLISHED ──编辑──> PENDING（自动重新送审）
 | --- | --- | --- |
 | GET | `/api/v1/review/contributions` | 列表，**默认 `status=PENDING`**，可按 `articleId` 过滤 |
 | GET | `/api/v1/review/contributions/{id}` | 审核详情，含文章当前正文供对照 |
-| POST | `/api/v1/review/contributions/{id}/approve` | 通过，body `{"comment": "...", "finalContent": "..."}` |
+| POST | `/api/v1/review/contributions/{id}/approve` | 通过，body `{"comment": "...", "finalContent": "..."}`，**`comment` 必填** |
 | POST | `/api/v1/review/contributions/{id}/reject` | 驳回，`comment` 必填 |
 
 **审核通过的事务边界**（开发档案 5.1，本项目最关键的约束）：
@@ -508,6 +520,10 @@ COMMIT
 
 **`finalContent` 的作用**：开发档案 5.1 要求「通过时必须明确最终采用的修改内容」。
 评审员在通过时可提交自己合并后的完整正文；不传则后端以 `suggestedContent` 作为新正文。
+
+**`comment` 必填（第三轮修复）**：需求 FR-KC-03 要求「审核必须填写意见」。
+通过与驳回都必须提交 `comment`，通过时为空返回 `400 通过时必须填写审核意见`；
+`finalContent` 仍可省略（省略即采用建议内容）。
 
 **实测（T08）**：对文章 8 提交纠错并通过后，
 文章 `version_no` 1 → 2、正文 523 → 596 字；
@@ -622,6 +638,15 @@ GET /api/v1/articles/{id}/versions/{versionNo}
 | GET | `/api/v1/events` | 公开 | 活动列表（含时间状态） |
 | GET | `/api/v1/events/{id}` | 公开 | 活动详情（规则、优秀作品、我的投稿） |
 | GET | `/api/v1/events/{id}/awards` | 公开 | 优秀作品 |
+| GET | `/api/v1/events/{id}/submissions` | 公开 | 参赛作品列表（不含评审得分） |
+
+**参赛作品列表**（第二批前端重构时新增）：返回该活动的全部投稿，供活动详情页的「参赛作品」区展示。
+
+- 字段：`workId`、`workTitle`、`workCover`、`workDescription`、`knowledgeCategoryName`（取学科主题色用）、
+  `submitterName`、`submittedAt`、`status`、`awardLevel`
+- **不返回评审数据**：`averageScore` 置空、`reviewCount` 置 0、`reviewedByMe` 恒为 false。
+  得分与评审详情属于评审工作台数据，只在 `/review/**` 下提供
+- 与评审列表（`/review/events/{id}/submissions`）同源，仅做公开口径裁剪
 
 **时间状态不落库**：`timeStatus` 每次读取时按当前时间计算，取值：
 
@@ -648,8 +673,12 @@ GET /api/v1/articles/{id}/versions/{versionNo}
 | GET | `/api/v1/events/{id}/submissions/mine` | 需登录 | 我在该活动的投稿 |
 | GET | `/api/v1/events/submissions/mine` | 需登录 | 我的全部投稿 |
 
-> 注意：`GET /api/v1/events/*/submissions/**` 在安全配置里**先于** `/events/**` 的公开规则匹配，
-> 因此「我的投稿」不会被当作公开接口放行。实测未登录访问返回 401。
+> 注意：安全配置里把 `GET /api/v1/events/*/submissions/mine` 与 `GET /api/v1/events/submissions/mine`
+> 单独声明为「需登录」，并且**写在** `/events/**` 公开规则之前，因此「我的投稿」不会被当作公开接口放行。
+> 实测未登录访问这两个路径均返回 401，而 `GET /events/{id}/submissions`（参赛作品列表）对游客开放。
+>
+> 早期这里用的是通配 `GET /api/v1/events/*/submissions/**`，会把后来新增的公开参赛作品列表一并拦掉，
+> 故收窄为两个明确的 `mine` 路径。改这类规则时务必先跑一次「游客访问公开接口」的实测。
 
 **谁能投稿**：任何**已登录用户**都可以参加活动，不再要求 `CREATOR` 角色。
 
@@ -888,12 +917,39 @@ DRAFT ──发布──> PUBLISHED ──下架──> OFFLINE
 
 > 作品不提供删除操作：已发布作品统一用「下架」，作者的历史记录与互动数据完整保留。
 
+### 2.29 后台评论管理（第三轮修复新增）
+
+需 `ADMIN` 或 `SUPER_ADMIN`。与前台 `/comments` 的分工：前台只能按单个目标查可见评论；
+后台跨全站检索，能看到已删除评论，用于处理违规内容与追溯删除记录。
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | `/api/v1/admin/comments` | 分页列表，支持 `targetType`、`targetId`、`status`、`keyword` |
+| DELETE | `/api/v1/admin/comments/{id}` | 删除违规评论（逻辑删除，保留楼层结构） |
+
+参数与返回：
+
+| 字段 | 说明 |
+| --- | --- |
+| `targetType` | `ARTICLE` / `WORK`，为空返回全部；其他值返回 `400 不支持的目标类型` |
+| `status` | `VISIBLE` / `HIDDEN` / `DELETED`，为空返回全部（含已删除） |
+| `keyword` | 对评论内容做 `LIKE` 匹配 |
+| 列表项 | `id`、`userId`、`userName`、`userAvatar`、`targetType`、`targetId`、`targetTitle`、`parentId`、`content`、`status`、`createdAt` |
+
+**实现要点**：
+
+- 标题批量查询（一页只回表一次），目标已删除时显示「已删除的文章/作品」，不因悬空引用报错。
+- 删除复用 `CommentService.delete`，与前台同一条逻辑删除路径；管理员操作额外写入 `sys_operation_log`（`COMMENT_DELETE`）。
+- 删除后楼层结构保留：被删评论下的回复仍在，只是该条内容不再对外可见。
+
+**前端入口**：`/admin/comments`（后台侧栏「运营 · 评论管理」）。
+
 ## 3. 规划中的接口清单
 
 以下路径来自开发档案 8.3 节，**尚未实现**。实际实现时以本表为准，并在完成后移入第 2 节。
 
 阶段 3–9 已实现认证、知识库、作品、知识共建、社区互动、主题活动、站内消息与账号管理共 **75 个接口**，
-见 2.2–2.25。开发档案第 8.3 节的接口清单已全部落地。
+见 2.2–2.25。开发档案第 8.3 节的接口清单已全部落地。第三轮修复另加 2 个后台评论接口（见 2.29）。
 
 > 与档案的路径偏离（已在各章节说明）：
 > - 创作者操作从 `/works` 改到 `/creator/works`（便于用路径规则统一授权）

@@ -57,17 +57,30 @@ public class WorkQueryService {
     /**
      * 公开作品分页。
      *
-     * @param page       页码
-     * @param size       每页条数
-     * @param categoryId 分类筛选
-     * @param keyword    关键词，匹配标题或简介
+     * @param page                页码
+     * @param size                每页条数
+     * @param categoryId          形态分类筛选（WORK 类型）
+     * @param knowledgeCategoryId 学科筛选（ARTICLE 类型）
+     * @param creatorId           作者筛选
+     * @param keyword             关键词，匹配标题或简介
      */
-    public IPage<WorkListItemVO> pagePublished(long page, long size, Long categoryId, String keyword) {
+    public IPage<WorkListItemVO> pagePublished(long page,
+                                               long size,
+                                               Long categoryId,
+                                               Long knowledgeCategoryId,
+                                               Long creatorId,
+                                               String keyword) {
         LambdaQueryWrapper<CreatorWork> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreatorWork::getStatus, STATUS_PUBLISHED);
 
         if (categoryId != null) {
             wrapper.eq(CreatorWork::getCategoryId, categoryId);
+        }
+        if (knowledgeCategoryId != null) {
+            wrapper.eq(CreatorWork::getKnowledgeCategoryId, knowledgeCategoryId);
+        }
+        if (creatorId != null) {
+            wrapper.eq(CreatorWork::getCreatorId, creatorId);
         }
         if (StringUtils.hasText(keyword)) {
             String escaped = escapeLike(keyword.trim());
@@ -204,6 +217,7 @@ public class WorkQueryService {
             return Collections.emptyList();
         }
         Map<Long, String> categoryNames = categoryNameMap(articles);
+        Map<Long, String> authorNames = authorNameMapOfArticles(articles);
         return articles.stream().map(article -> {
             ArticleBriefVO vo = new ArticleBriefVO();
             vo.setId(article.getId());
@@ -211,8 +225,25 @@ public class WorkQueryService {
             vo.setSummary(article.getSummary());
             vo.setCoverUrl(article.getCoverUrl());
             vo.setCategoryName(categoryNames.get(article.getCategoryId()));
+            vo.setAuthorName(authorNames.get(article.getAuthorId()));
+            vo.setViewCount(article.getViewCount());
             return vo;
         }).toList();
+    }
+
+    /**
+     * 批量取文章作者昵称。
+     */
+    private Map<Long, String> authorNameMapOfArticles(List<ScienceArticle> articles) {
+        Set<Long> authorIds = articles.stream()
+                .map(ScienceArticle::getAuthorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (authorIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return sysUserMapper.selectBatchIds(authorIds).stream()
+                .collect(Collectors.toMap(SysUser::getId, SysUser::getNickname, (a, b) -> a));
     }
 
     /**

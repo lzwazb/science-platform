@@ -10,6 +10,7 @@ import com.science.platform.modules.interaction.entity.InteractionComment;
 import com.science.platform.modules.interaction.mapper.InteractionCommentMapper;
 import com.science.platform.modules.interaction.vo.CommentVO;
 import com.science.platform.modules.notification.service.NotificationService;
+import com.science.platform.modules.system.service.OperationLogService;
 import com.science.platform.modules.user.entity.SysUser;
 import com.science.platform.modules.user.mapper.SysUserMapper;
 import org.springframework.stereotype.Service;
@@ -37,13 +38,16 @@ public class CommentService {
     private final InteractionCommentMapper commentMapper;
     private final SysUserMapper sysUserMapper;
     private final NotificationService notificationService;
+    private final OperationLogService operationLogService;
 
     public CommentService(InteractionCommentMapper commentMapper,
                           SysUserMapper sysUserMapper,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          OperationLogService operationLogService) {
         this.commentMapper = commentMapper;
         this.sysUserMapper = sysUserMapper;
         this.notificationService = notificationService;
+        this.operationLogService = operationLogService;
     }
 
     /**
@@ -168,6 +172,13 @@ public class CommentService {
                 .set(InteractionComment::getStatus, STATUS_DELETED)
                 .set(InteractionComment::getUpdatedAt, LocalDateTime.now());
         commentMapper.update(null, wrapper);
+
+        // 管理员删除属于治理动作，记入操作日志；用户删自己的评论不记，避免日志噪音
+        if (isAdmin) {
+            operationLogService.record(operatorId, "COMMENT_DELETE", comment.getTargetType(),
+                    comment.getTargetId(),
+                    "删除评论 #" + id + "（" + comment.getTargetType() + "#" + comment.getTargetId() + "）");
+        }
     }
 
     private List<CommentVO> toVOs(List<InteractionComment> comments, Long currentUserId) {

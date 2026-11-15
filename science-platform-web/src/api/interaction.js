@@ -92,3 +92,19 @@ export function listAdminFeedback(params) {
 export function handleFeedback(id, payload) {
   return request.post(`/admin/feedback/${id}/handle`, payload)
 }
+
+// ---------------- 后台评论管理 ----------------
+
+/**
+ * 后台评论列表：跨内容检索，可按目标类型、状态、关键词筛选，含已删除评论。
+ */
+export function listAdminComments(params) {
+  return request.get('/admin/comments', { params })
+}
+
+/**
+ * 后台删除评论（逻辑删除，保留楼层结构）。
+ */
+export function deleteAdminComment(id) {
+  return request.delete(`/admin/comments/${id}`)
+}

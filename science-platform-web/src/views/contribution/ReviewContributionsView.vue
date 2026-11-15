@@ -88,6 +88,10 @@ function applySuggestionAsContent() {
 
 async function handleApprove() {
   if (!current.value) return
+  if (!comment.value.trim()) {
+    ElMessage.warning('通过时必须填写审核意见')
+    return
+  }
   if (!finalContent.value.trim()) {
     ElMessage.warning('最终正文不能为空')
     return
@@ -263,7 +267,7 @@ onMounted(fetchRows)
                 :rows="3"
                 maxlength="1000"
                 show-word-limit
-                placeholder="通过可不填；驳回必须填写具体原因"
+                placeholder="通过和驳回都必须填写具体原因，提交者会看到这段意见"
               />
             </section>
           </template>

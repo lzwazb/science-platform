@@ -329,6 +329,25 @@ class ContributionApiTest {
         assertEquals(suggestion, articleMapper.selectById(ARTICLE_ID_5).getContent());
     }
 
+    @Test
+    @DisplayName("通过审核必须填写审核意见（需求 FR-KC-03）")
+    void approveRequiresComment() throws Exception {
+        String userToken = token("user01");
+        String reviewerToken = token("reviewer01");
+        long id = submitContribution(userToken, ARTICLE_ID, "用来验证「必须填意见」的建议内容。");
+
+        mockMvc.perform(post("/api/v1/review/contributions/" + id + "/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}")
+                        .header("Authorization", "Bearer " + reviewerToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("必须填写审核意见")));
+
+        // 被拒绝的审核不能改动文章版本：仍停留在待审核
+        assertEquals("PENDING", contributionMapper.selectById(id).getStatus());
+    }
+
     // ---------- 版本历史 ----------
 
     @Test
